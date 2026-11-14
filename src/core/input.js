@@ -23,8 +23,9 @@ const PAD_BTN = { attack: [2], heavy: [7], dodge: [0], skill1: [4], skill2: [5],
 const ACTIONS = ['attack', 'heavy', 'dodge', 'skill1', 'skill2', 'potion', 'interact', 'pause', 'confirm', 'back', 'up', 'down', 'left', 'right'];
 
 const keys = new Set();
+const tapped = new Set(); // keys pressed since the last poll (so quick taps are never lost on slow frames)
 window.addEventListener('keydown', (e) => {
-  keys.add(e.code);
+  keys.add(e.code); if (!e.repeat) tapped.add(e.code);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Slash', 'Quote', 'Tab'].includes(e.code)) e.preventDefault();
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
@@ -47,7 +48,9 @@ class Controller {
     let mx = 0, my = 0;
     if (this.layout) {
       const L = this.layout;
-      for (const a of ACTIONS) this.held[a] = (L[a] || []).some((k) => keys.has(k));
+      for (const a of ACTIONS) this.held[a] = (L[a] || []).some((k) => keys.has(k) || tapped.has(k));
+      // a key tapped and released within one frame still counts as a fresh press
+      for (const a of ACTIONS) if ((L[a] || []).some((k) => tapped.has(k) && !keys.has(k))) this.prev[a] = false;
       mx = (this.held.right ? 1 : 0) - (this.held.left ? 1 : 0);
       my = (this.held.down ? 1 : 0) - (this.held.up ? 1 : 0);
       const len = Math.hypot(mx, my); if (len > 0) { mx /= len; my /= len; }
@@ -94,6 +97,7 @@ export const input = {
       }
     });
     for (const c of this.controllers) c.poll(pads, dt);
+    tapped.clear();
   },
   byId(id) { return this.controllers.find((c) => c.id === id); },
   anyPressed(a) { return this.controllers.find((c) => c.connected && c.pressed(a)); },

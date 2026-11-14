@@ -264,7 +264,8 @@ export class Hero extends Actor {
     if (this.lantern) this.lantern.intensity = this.dead ? 0 : this.lantern.intensity;
 
     if (this.dead) { this.syncModel(dt); return; }
-    const c = this.ctrl;
+    // a player with a menu panel open steers the panel, not the hero
+    const c = this.menuLock ? null : this.ctrl;
 
     if (this.downed) { this.updateDowned(dt, c); this.syncModel(dt); return; }
 

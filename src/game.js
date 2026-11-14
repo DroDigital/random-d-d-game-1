@@ -219,7 +219,7 @@ export class Game {
     // content
     const roomDef = ROOM_TYPES[type];
     this.ui.roomTitle(roomDef ? roomDef.name : type, `${depth.sub} · Room ${run.roomIndex}/${ROOMS_PER_DEPTH}`);
-    if (type === 'shrine') { this.addShrine(0, 0); this.interactables.push({ x: 0, z: 0, r: 3.2, label: 'Rest at the Ember Shrine', kind: 'shrine' }); this.setCleared(true); audio.music('shrine'); }
+    if (type === 'shrine') { this.addShrine(0, 0); this.interactables.push({ x: 0, z: 0, r: 4.4, label: 'Rest at the Ember Shrine', kind: 'shrine' }); this.setCleared(true); audio.music('shrine'); }
     else if (type === 'peddler') this.setupPeddler();
     else if (type === 'altar') this.setupAltar();
     else if (type === 'boss') await this.setupBoss();
@@ -320,7 +320,7 @@ export class Game {
     });
     for (const [px, pz, n] of [[-2.4, -3.5, 'chest_large_gold'], [2.4, -3.5, 'barrel_small_stack'], [-3.5, -1.5, 'coin_stack_large']]) { const c = this.kit.clone(n); c.position.set(px, 0, pz); this.scene.add(c); this.extra.push(c); }
     this.fx.persistentLight({ x, y: 3, z: z + 1.5, color: 0xffd090, intensity: 10, distance: 12, flicker: 0.2 });
-    this.interactables.push({ x, z, r: 3.4, label: 'Trade with Ossa the Ash-Merchant', kind: 'peddler' });
+    this.interactables.push({ x, z, r: 4.2, label: 'Trade with Ossa the Ash-Merchant', kind: 'peddler' });
   }
 
   setupAltar() {
@@ -334,7 +334,7 @@ export class Game {
     const p2 = this.kit.clone('pillar_decorated'); p2.position.set(x + 3, 0, z - 1); this.scene.add(p2); this.extra.push(p2);
     this.fx.decal('dngn_floor_sigil_circle', { x, z, size: 7, color: 0xff5a3a, opacity: 0.7, life: 1e9 });
     this.fx.persistentLight({ x, y: 3, z, color: 0xff5a3a, intensity: 12, distance: 14, flicker: 0.4 });
-    this.interactables.push({ x, z, r: 3.2, label: "Roll at the Dicer's Altar", kind: 'altar' });
+    this.interactables.push({ x, z, r: 4.2, label: "Roll at the Dicer's Altar", kind: 'altar' });
     this.altarRolled = new Set();
   }
 
@@ -647,7 +647,6 @@ export class Game {
     // per-hero input (panels capture their owner's controller)
     for (const h of this.heroes) { h.menuLock = this.ui.panelFor(h); }
     for (const h of this.heroes) {
-      if (h.menuLock) { const c = h.ctrl; if (c) { c.move.x = 0; c.move.y = 0; for (const k in c.held) c.held[k] = false; } }
       h.update(dt);
       h.vel.set(0, 0, 0);
     }
@@ -745,7 +744,13 @@ export class Game {
       d.sign.position.y = 5.2 + Math.sin(this.time * 2 + d.x) * 0.2;
       d.sign.material.opacity = d.open ? 1 : 0.55;
       if (d.open && !this.transitioning) {
-        for (const h of this.heroes) if (h.canAct && Math.hypot(h.pos.x - d.x, h.pos.z - d.z) < 1.9) { this.useDoor(d); break; }
+        // anywhere across the doorway's width counts, not just its centre
+        const ns = d.side === 'N' || d.side === 'S';
+        for (const h of this.heroes) {
+          if (!h.canAct) continue;
+          const along = Math.abs(ns ? h.pos.x - d.x : h.pos.z - d.z), depth = Math.abs(ns ? h.pos.z - d.z : h.pos.x - d.x);
+          if (along < 2.1 && depth < 1.8) { this.useDoor(d); break; }
+        }
       }
     }
   }

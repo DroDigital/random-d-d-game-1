@@ -25,13 +25,35 @@ await press('Slash'); await step(300);      // P2 joins
 await press('ArrowRight'); await step(200); // P2 changes class
 await page.screenshot({ path: path.join(OUT, '02-select.png') });
 await press('Space'); await press('Slash'); // ready
-await step(9000);
+try {
+  await page.waitForFunction(() => window.__game.mode === 'play' && !document.querySelector('.layer-fade.on'), null, { timeout: 120000 });
+} catch (e) {
+  await page.screenshot({ path: path.join(OUT, 'fail-start.png') });
+  console.log('run did not start', JSON.stringify(await page.evaluate(() => ({ mode: window.__game.mode, screen: window.__game.ui.screen, err: String(window.__aoErr || '') }))), errors.join('\n'));
+  process.exit(1);
+}
+await step(1500);
 await page.screenshot({ path: path.join(OUT, '03-shrine.png') });
-// rest at shrine and walk north to the door
+// walk to the shrine, rest, then walk north to the door
+// hold until the party reaches the shrine (frame-rate independent)
+await page.keyboard.down('KeyW'); await page.keyboard.down('ArrowUp');
+await page.waitForFunction(() => window.__game.heroes[0].pos.z < 3, null, { timeout: 60000 });
+await page.keyboard.up('KeyW'); await page.keyboard.up('ArrowUp');
 await press('KeyF'); await step(800);
 await page.screenshot({ path: path.join(OUT, '04-shrine-panel.png') });
 await press('Escape'); await step(300);
-await page.keyboard.down('KeyW'); await page.keyboard.down('ArrowUp'); await step(3500); await page.keyboard.up('KeyW'); await page.keyboard.up('ArrowUp');
+// line the party up in front of the first north door, then walk through it
+await page.evaluate(() => { const g = window.__game; const d = g.doors.find((x) => x.side === 'N') || g.doors[0]; g.heroes.forEach((h, i) => h.pos.set(d.x + d.inX * 5 + (i - 0.5), 0, d.z + d.inZ * 5)); g.leashCenter = { x: d.x + d.inX * 5, z: d.z + d.inZ * 5 }; });
+const dirKeys = await page.evaluate(() => { const g = window.__game; const d = g.doors.find((x) => x.side === 'N') || g.doors[0]; return d.side === 'N' ? ['KeyW', 'ArrowUp'] : d.side === 'W' ? ['KeyA', 'ArrowLeft'] : ['KeyD', 'ArrowRight']; });
+for (const k of dirKeys) await page.keyboard.down(k);
+try {
+  await page.waitForFunction(() => window.__game.roomType !== 'shrine', null, { timeout: 90000 });
+} catch (e) {
+  await page.screenshot({ path: path.join(OUT, 'fail-door.png') });
+  console.log('did not leave the shrine', JSON.stringify(await page.evaluate(() => { const g = window.__game; return { heroes: g.heroes.map((h) => [h.pos.x, h.pos.z, h.state]), doors: g.doors.map((d) => [d.side, d.x, d.z, d.open]), panels: g.ui.panels.size, paused: g.paused, toast: document.querySelector('.layer-toast').textContent }; })));
+  process.exit(1);
+}
+for (const k of dirKeys) await page.keyboard.up(k);
 await step(3000);
 await page.screenshot({ path: path.join(OUT, '05-room.png') });
 // fight a bit
