@@ -9,6 +9,11 @@ import { VOWS, UNLOCKS, ROOM_TYPES } from '../data/world.js';
 import { LEVEL_COST, MAX_LEVEL, d20, rng } from '../core/rules.js';
 import { settings as psx } from '../render/psx.js';
 import { draftBoons } from '../world/run.js';
+import { t, LANGUAGES, getLang, setLang } from '../i18n/index.js';
+import { DEPTHS } from '../data/world.js';
+
+const COND = { rage: 'RAGE', surge: 'ACTION SURGE', slowed: 'SLOWED', poisoned: 'POISONED', frightened: 'FRIGHTENED', hexed: 'HEXED', prone: 'PRONE', shadowAdv: 'HIDDEN', alert: 'ALERT', whirl: 'WHIRL', reckless: 'RECKLESS', fumbled: 'FUMBLED', dash: 'DASH', chilled: 'CHILLED', frozen: 'FROZEN' };
+export const ctrlLabel = (c) => (c ? (c.layout ? t(c.label) : t('Gamepad {0}', c.padIndex + 1)) : '');
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
@@ -35,14 +40,14 @@ export class UI {
 
   // ------------------------------------------------------------ generic
   fade(on) { this.layer.fade.classList.toggle('on', on); }
-  banner(sup, text, t = 2) {
+  banner(sup, text, dur = 2) {
     const b = this.layer.banner;
-    b.innerHTML = `<div class="banner-in">${sup ? `<div class="banner-sup">${sup}</div>` : ''}<div class="banner-text">${text}</div></div>`;
+    b.innerHTML = `<div class="banner-in">${sup ? `<div class="banner-sup">${t(sup)}</div>` : ''}<div class="banner-text">${t(text)}</div></div>`;
     b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
-    clearTimeout(this.bannerTimer); this.bannerTimer = setTimeout(() => b.classList.remove('show'), t * 1000);
+    clearTimeout(this.bannerTimer); this.bannerTimer = setTimeout(() => b.classList.remove('show'), dur * 1000);
   }
-  roomTitle(name, sub) { this.roomName = name; this.roomSub = sub; }
-  toast(msg) { this.layer.toast.textContent = msg; this.layer.toast.classList.add('show'); clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => this.layer.toast.classList.remove('show'), 1800); }
+  roomTitle(name, sub) { this.roomName = t(name); this.roomSub = sub; }
+  toast(msg) { this.layer.toast.textContent = t(msg); this.layer.toast.classList.add('show'); clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => this.layer.toast.classList.remove('show'), 1800); }
   updateLog(lines) {
     if (!this.game.showLog) { this.layer.log.innerHTML = ''; return; }
     this.layer.log.innerHTML = lines.map((l) => `<div style="color:${l.color}">${l.msg}</div>`).join('');
@@ -92,86 +97,87 @@ export class UI {
     audio.music('title');
     this.setScreen('title', () => {
       const w = h('div', 'title-screen');
-      w.appendChild(h('div', 'title-logo', `<div class="t1">ASHEN&nbsp;OATH</div><div class="t2">a couch co-op souls-roguelite of the Fifth Edition</div>`));
+      w.appendChild(h('div', 'title-logo', `<div class="t1">ASHEN&nbsp;OATH</div><div class="t2">${t('a couch co-op souls-roguelite of the Fifth Edition')}</div>`));
       w.appendChild(this.menu([
-        { label: 'Begin the Oath', action: () => this.showSelect() },
-        { label: `Vows <small>(${this.game.vowsChosen.size} sworn)</small>`, action: () => this.showVows() },
-        { label: `Reliquary <small>(${meta.data.marks} ✦)</small>`, action: () => this.showReliquary() },
-        { label: 'How to Play', action: () => this.showHelp() },
-        { label: 'Options', action: () => this.showOptions(() => this.showTitle()) },
-        { label: 'Credits', action: () => this.showCredits() },
+        { label: t('Begin the Oath'), action: () => this.showSelect() },
+        { label: `${t('Vows')} <small>(${t('{0} sworn', this.game.vowsChosen.size)})</small>`, action: () => this.showVows() },
+        { label: `${t('Reliquary')} <small>(${meta.data.marks} ✦)</small>`, action: () => this.showReliquary() },
+        { label: t('How to Play'), action: () => this.showHelp() },
+        { label: t('Options'), action: () => this.showOptions(() => this.showTitle()) },
+        { label: t('Credits'), action: () => this.showCredits() },
       ], { cls: 'title-menu' }));
-      w.appendChild(h('div', 'title-foot', `Runs ${meta.data.runs} · Victories ${meta.data.wins} · Deepest ${['—', 'I', 'II', 'III'][meta.data.bestDepth] || 'III'} · Foes slain ${meta.data.kills}<br>1–4 players · keyboard (2 players) + gamepads`));
+      w.appendChild(h('div', 'title-foot', `${t('Runs {0} · Victories {1} · Deepest {2} · Foes slain {3}', meta.data.runs, meta.data.wins, ['—', 'I', 'II', 'III'][meta.data.bestDepth] || 'III', meta.data.kills)}<br>${t('1–4 players · keyboard (2 players) + gamepads')}`));
       return w;
     });
   }
 
   showVows() {
     const items = VOWS.map((v) => ({
-      get label() { return `<span class="chk">${this.on ? '☒' : '☐'}</span> ${v.name} <small>${v.desc} (+${v.marks}✦)</small>`; },
+      get label() { return `<span class="chk">${this.on ? '☒' : '☐'}</span> ${t(v.name)} <small>${t(v.desc)} (+${v.marks}✦)</small>`; },
       on: this.game.vowsChosen.has(v.id),
       action: () => { if (this.game.vowsChosen.has(v.id)) this.game.vowsChosen.delete(v.id); else this.game.vowsChosen.add(v.id); this.showVows(); },
     }));
     items.forEach((it, i) => { it.on = this.game.vowsChosen.has(VOWS[i].id); });
-    items.push({ label: 'Back', action: () => this.showTitle() });
+    items.push({ label: t('Back'), action: () => this.showTitle() });
     const idx = this.menuIndex;
-    this.setScreen('vows', () => this.menu(items, { title: 'Vows', sub: 'Swear vows for a harder descent. Each grants more Oath Marks when you fall or win.' }));
+    this.setScreen('vows', () => this.menu(items, { title: t('Vows'), sub: t('Swear vows for a harder descent. Each grants more Oath Marks when you fall or win.') }));
     this.menuIndex = Math.min(idx, items.length - 1); this.paintMenu();
     this.onBack = () => this.showTitle();
   }
 
   showReliquary() {
     const items = UNLOCKS.map((u) => ({
-      label: `${meta.has(u.id) ? '<span class="owned">✔</span>' : `<span class="cost">${u.cost}✦</span>`} ${u.name} <small>${u.desc}</small>`,
+      label: `${meta.has(u.id) ? '<span class="owned">✔</span>' : `<span class="cost">${u.cost}✦</span>`} ${t(u.name)} <small>${t(u.desc)}</small>`,
       disabled: meta.has(u.id) || meta.data.marks < u.cost,
       action: () => { if (meta.unlock(u.id, u.cost)) { audio.play('levelUp'); this.showReliquary(); } },
     }));
-    items.push({ label: 'Back', action: () => this.showTitle() });
+    items.push({ label: t('Back'), action: () => this.showTitle() });
     const idx = this.menuIndex;
-    this.setScreen('reliquary', () => this.menu(items, { title: 'Reliquary', sub: `Spend Oath Marks earned across runs. You hold <b>${meta.data.marks}✦</b>.` }));
+    this.setScreen('reliquary', () => this.menu(items, { title: t('Reliquary'), sub: t('Spend Oath Marks earned across runs. You hold <b>{0}✦</b>.', meta.data.marks) }));
     this.menuIndex = Math.min(idx, items.length - 1); this.paintMenu();
     this.onBack = () => this.showTitle();
   }
 
   showOptions(back) {
-    const opt = (label, get, adjust) => ({ get label() { return `${label} <span class="val">◂ ${get()} ▸</span>`; }, action: () => { adjust(1); this.showOptions(back); }, adjust: (d) => { adjust(d); this.showOptions(back); } });
+    const opt = (label, get, adjust) => ({ get label() { return `${t(label)} <span class="val">◂ ${get()} ▸</span>`; }, action: () => { adjust(1); this.showOptions(back); }, adjust: (d) => { adjust(d); this.showOptions(back); } });
     const toggle = (k) => () => { psx[k] = !psx[k]; this.game.psx.applySettings(); this.saveSettings(); };
     const items = [
+      opt('Language', () => LANGUAGES.find((l) => l.id === getLang()).name, (d) => { const i = LANGUAGES.findIndex((l) => l.id === getLang()); setLang(LANGUAGES[(i + d + LANGUAGES.length) % LANGUAGES.length].id); this.saveSettings(); this.game.onLanguageChange && this.game.onLanguageChange(); }),
       opt('Resolution', () => psx.height + 'p', (d) => { const r = [180, 240, 300, 360, 480]; psx.height = r[(r.indexOf(psx.height) + d + r.length) % r.length]; this.game.psx.applySettings(); this.saveSettings(); }),
-      opt('Vertex wobble', () => (psx.jitter ? 'on' : 'off'), toggle('jitter')),
-      opt('Texture warp', () => (psx.affine ? 'on' : 'off'), toggle('affine')),
-      opt('Dithering', () => (psx.dither ? 'on' : 'off'), toggle('dither')),
-      opt('Ink outlines', () => (psx.outline ? 'on' : 'off'), toggle('outline')),
-      opt('Scanlines', () => (psx.scanlines ? 'on' : 'off'), toggle('scanlines')),
+      opt('Vertex wobble', () => t(psx.jitter ? 'on' : 'off'), toggle('jitter')),
+      opt('Texture warp', () => t(psx.affine ? 'on' : 'off'), toggle('affine')),
+      opt('Dithering', () => t(psx.dither ? 'on' : 'off'), toggle('dither')),
+      opt('Ink outlines', () => t(psx.outline ? 'on' : 'off'), toggle('outline')),
+      opt('Scanlines', () => t(psx.scanlines ? 'on' : 'off'), toggle('scanlines')),
       opt('Palette grade', () => Math.round(psx.grade * 100) + '%', (d) => { psx.grade = Math.max(0, Math.min(1.6, psx.grade + d * 0.2)); this.saveSettings(); }),
       opt('Music', () => Math.round(audioSettings.music * 100) + '%', (d) => { audioSettings.music = Math.max(0, Math.min(1, audioSettings.music + d * 0.1)); audio.refreshVolume(); this.saveSettings(); }),
       opt('Sound FX', () => Math.round(audioSettings.sfx * 100) + '%', (d) => { audioSettings.sfx = Math.max(0, Math.min(1, audioSettings.sfx + d * 0.1)); this.saveSettings(); }),
-      opt('Announcer', () => (audioSettings.announcer ? 'on' : 'off'), () => { audioSettings.announcer = !audioSettings.announcer; this.saveSettings(); }),
-      opt('Dice log', () => (this.game.showLog ? 'on' : 'off'), () => { this.game.showLog = !this.game.showLog; this.saveSettings(); }),
-      { label: 'Back', action: back },
+      opt('Announcer', () => t(audioSettings.announcer ? 'on' : 'off'), () => { audioSettings.announcer = !audioSettings.announcer; this.saveSettings(); }),
+      opt('Dice log', () => t(this.game.showLog ? 'on' : 'off'), () => { this.game.showLog = !this.game.showLog; this.saveSettings(); }),
+      { label: t('Back'), action: back },
     ];
     const idx = this.menuIndex;
-    this.setScreen('options', () => this.menu(items, { title: 'Options', sub: 'The PSX look is a filter: every option can be dialled back.' }));
+    this.setScreen('options', () => this.menu(items, { title: t('Options'), sub: t('The PSX look is a filter: every option can be dialled back.') }));
     this.menuIndex = Math.min(idx, items.length - 1); this.paintMenu();
     this.onBack = back;
   }
-  saveSettings() { meta.data.settings = { psx: { ...psx }, audio: { ...audioSettings }, showLog: this.game.showLog }; meta.save(); }
+  saveSettings() { meta.data.settings = { psx: { ...psx }, audio: { ...audioSettings }, showLog: this.game.showLog, lang: getLang() }; meta.save(); }
 
   showHelp() {
     this.setScreen('help', () => {
       const w = h('div', 'menu help');
       const g1 = input.controllers[0].glyph, g2 = input.controllers[1].glyph;
       const pad = { attack: 'X', heavy: 'RT', dodge: 'A', skill1: 'LB', skill2: 'RB', potion: 'Y', interact: 'B', move: 'L-Stick' };
-      const row = (n, k) => `<tr><td>${n}</td><td>${keycap(g1[k])}</td><td>${keycap(g2[k])}</td><td>${keycap(pad[k])}</td></tr>`;
-      w.innerHTML = `<div class="menu-title">How to Play</div>
-      <table class="controls"><tr><th></th><th>Keyboard 1</th><th>Keyboard 2</th><th>Gamepad</th></tr>
+      const row = (n, k) => `<tr><td>${t(n)}</td><td>${keycap(g1[k])}</td><td>${keycap(g2[k])}</td><td>${keycap(pad[k])}</td></tr>`;
+      w.innerHTML = `<div class="menu-title">${t('How to Play')}</div>
+      <table class="controls"><tr><th></th><th>${t('Keyboard 1')}</th><th>${t('Keyboard 2')}</th><th>${t('Gamepad')}</th></tr>
       ${row('Move', 'move')}${row('Attack', 'attack')}${row('Heavy attack', 'heavy')}${row('Dodge roll', 'dodge')}${row('Skill 1', 'skill1')}${row('Skill 2', 'skill2')}${row('Potion', 'potion')}${row('Interact / revive', 'interact')}</table>
       <div class="help-cols">
-      <div><h3>Souls-like</h3><p>Every swing and roll costs <b>stamina</b>. Dodging grants brief invulnerability. Foes <b>telegraph</b> attacks with red ground markings — roll through them. Heavy hits build <b>poise</b> damage; staggered foes take advantage and crit on 18+.</p>
-      <p>Fall to 0 HP and you're <b>downed</b>: make death saves while an ally holds Interact to revive you. If the whole party falls, an <b>Ember</b> is spent and you rekindle at the last shrine — but your <b>Ash</b> stays where you died.</p></div>
-      <div><h3>Fifth Edition</h3><p>Every attack is a real <b>d20 + bonus vs AC</b>. Natural 20s crit, natural 1s fumble. Advantage from flanking (an ally on the far side), backstabs, staggers, Hunter's Mark. Area spells call for <b>saving throws</b>. Damage types, resistances and vulnerabilities matter: skeletons shatter to bludgeoning, shades shrug off steel.</p></div>
-      <div><h3>Roguelite</h3><p>Choose your path through branching doors: battles, elites, vaults, peddlers, the Dicer's Altar. Draft <b>boons</b> — feats, magic items, spell-pacts — after each fight. Three boons of one pact = <b>Attunement</b>. Two players with two each = a <b>Pact Bond</b> both enjoy. Spend Ash at <b>Ember Shrines</b> to level up (1–10). Earn Oath Marks for permanent unlocks, swear Vows for a harder climb.</p></div>
-      </div><div class="menu-sub">Press back to return</div>`;
+      <div><h3>${t('Souls-like')}</h3><p>${t('help.souls1')}</p>
+      <p>${t('help.souls2')}</p></div>
+      <div><h3>${t('Fifth Edition')}</h3><p>${t('help.dnd')}</p></div>
+      <div><h3>${t('Roguelite')}</h3><p>${t('help.rogue')}</p></div>
+      </div><div class="menu-sub">${t('Press back to return')}</div>`;
       return w;
     });
     this.menuItems = [{ label: 'back', action: () => this.showTitle() }];
@@ -181,11 +187,11 @@ export class UI {
   showCredits() {
     this.setScreen('credits', () => {
       const w = h('div', 'menu help');
-      w.innerHTML = `<div class="menu-title">Credits</div>
+      w.innerHTML = `<div class="menu-title">${t('Credits')}</div>
       <div class="credits">
-      <p><b>Ashen Oath</b> — game design, code, shaders and the "Ashcore" PSX filter written for this project.</p>
-      <h3>Libraries</h3><p>three.js (MIT) · rot.js (BSD-3) · howler.js (MIT) · Fontsource: IM Fell English & VT323 (OFL) · esbuild (MIT)</p>
-      <h3>Art & audio (all CC0 unless noted)</h3>
+      <p>${t('credits.game')}</p>
+      <h3>${t('Libraries')}</h3><p>three.js (MIT) · rot.js (BSD-3) · howler.js (MIT) · Fontsource: IM Fell English & VT323 (OFL) · Noto Serif CJK SC/JP (OFL) · Electron (MIT) · esbuild (MIT)</p>
+      <h3>${t('Art & audio (all CC0 unless noted)')}</h3>
       <p>KayKit Adventurers, Skeletons, Character Animations, Dungeon Remastered, Board Game Bits — Kay Lousberg<br>
       Ultimate Monsters — Quaternius<br>
       Particle Pack, Smoke Particles, Light Masks, Fantasy UI Borders, RPG Audio, Impact Sounds, Interface Sounds, Music Loops, Music Jingles, Fighter Voiceover — Kenney<br>
@@ -193,8 +199,8 @@ export class UI {
       Dungeon Crawl Stone Soup tiles (CC0 release)<br>
       game-icons.net — Lorc, Delapouite, Skoll, Sbed, Felbrigg, Zeromancer, Faithtoken, Carl Olsen and others (CC BY 3.0)<br>
       Curated via the series-ai/jam-ready-assets collection.</p>
-      <p>Dungeons & Dragons 5e mechanics are referenced under the SRD 5.1 (CC BY 4.0). Not affiliated with Wizards of the Coast.</p></div>
-      <div class="menu-sub">Press back to return</div>`;
+      <p>${t('credits.srd')}</p></div>
+      <div class="menu-sub">${t('Press back to return')}</div>`;
       return w;
     });
     this.menuItems = [{ label: 'back', action: () => this.showTitle() }];
@@ -208,8 +214,8 @@ export class UI {
     this.onBack = null;
     this.setScreen('select', () => {
       const w = h('div', 'select');
-      w.appendChild(h('div', 'menu-title', 'The Gathering'));
-      w.appendChild(h('div', 'menu-sub', 'Each player presses <b>Attack</b> on their keyboard half or gamepad to join. ◂ ▸ class · ▴ ▾ colours · Attack to ready · Back to leave'));
+      w.appendChild(h('div', 'menu-title', t('The Gathering')));
+      w.appendChild(h('div', 'menu-sub', t('select.howto')));
       const row = h('div', 'select-row'); this.selectRow = row; w.appendChild(row);
       w.appendChild(h('div', 'select-foot', ''));
       return w;
@@ -226,23 +232,23 @@ export class UI {
       const s = this.slots[i];
       const card = h('div', 'pcard' + (s ? ' joined' : '') + (s && s.ready ? ' ready' : ''));
       card.style.setProperty('--pc', PLAYER_COLORS[i]);
-      if (!s) { card.innerHTML = `<div class="pslot">P${i + 1}</div><div class="pjoin">Press Attack to join</div>`; row.appendChild(card); continue; }
+      if (!s) { card.innerHTML = `<div class="pslot">P${i + 1}</div><div class="pjoin">${t('Press Attack to join')}</div>`; row.appendChild(card); continue; }
       const c = CLASSES[CLASS_ORDER[s.ci]];
       const locked = !this.classUnlocked(c.id);
       const ctrl = input.byId(s.controllerId);
-      card.innerHTML = `<div class="pslot">P${i + 1} <small>${ctrl ? ctrl.label : ''}</small></div>
-        <div class="pclass" style="color:${c.color}">◂ ${c.name} ▸</div><div class="ptitle">${c.title}</div>
-        ${locked ? `<div class="plock">LOCKED — unlock in the Reliquary</div>` : ''}
+      card.innerHTML = `<div class="pslot">P${i + 1} <small>${ctrlLabel(ctrl)}</small></div>
+        <div class="pclass" style="color:${c.color}">◂ ${t(c.name)} ▸</div><div class="ptitle">${t(c.title)}</div>
+        ${locked ? `<div class="plock">${t('LOCKED — unlock in the Reliquary')}</div>` : ''}
         <div class="pstats">HP ${c.hitDie + Math.floor((c.abilities.con - 10) / 2) + 8} · AC ${c.armor.base + Math.min(Math.floor((c.abilities.dex - 10) / 2), c.armor.dexCap) + c.armor.shield + (c.armor.conToAc ? Math.floor((c.abilities.con - 10) / 2) : 0)} · d${c.hitDie}</div>
-        <div class="pabil">${['str', 'dex', 'con', 'int', 'wis', 'cha'].map((k) => `<span><b>${k.toUpperCase()}</b>${c.abilities[k]}</span>`).join('')}</div>
-        <div class="pblurb">${c.blurb}</div>
-        <div class="pskills">${c.skills.map((sk) => `<div>${icon(sk.icon, c.color)}<b>${sk.name}</b><br><small>${sk.desc}</small></div>`).join('')}</div>
-        <div class="pskin">Colours: ${s.skin ? s.skin.replace('alt_', 'Variant ') : 'Classic'} ${meta.has('skins') ? '▴▾' : '<small>(unlock: Ashen Wardrobe)</small>'}</div>
-        <div class="pready">${s.ready ? 'READY' : 'Press Attack when ready'}</div>`;
+        <div class="pabil">${['str', 'dex', 'con', 'int', 'wis', 'cha'].map((k) => `<span><b>${t(k.toUpperCase())}</b>${c.abilities[k]}</span>`).join('')}</div>
+        <div class="pblurb">${t(c.blurb)}</div>
+        <div class="pskills">${c.skills.map((sk) => `<div>${icon(sk.icon, c.color)}<b>${t(sk.name)}</b><br><small>${t(sk.desc)}</small></div>`).join('')}</div>
+        <div class="pskin">${t('Colours')}: ${s.skin ? t('Variant {0}', s.skin.replace('alt_', '')) : t('Classic')} ${meta.has('skins') ? '▴▾' : `<small>(${t('unlock: Ashen Wardrobe')})</small>`}</div>
+        <div class="pready">${s.ready ? t('READY') : t('Press Attack when ready')}</div>`;
       row.appendChild(card);
     }
     const n = this.slots.filter(Boolean).length, r = this.slots.filter((s) => s && s.ready).length;
-    if (this.selectFoot) this.selectFoot.innerHTML = n === 0 ? 'Waiting for heroes…' : r === n ? 'The oath is sworn…' : `${r}/${n} ready · Back with no one joined returns to title`;
+    if (this.selectFoot) this.selectFoot.innerHTML = n === 0 ? t('Waiting for heroes…') : r === n ? t('The oath is sworn…') : t('{0}/{1} ready · Back with no one joined returns to title', r, n);
   }
   selectInput(dt) {
     const free = () => { for (let i = 0; i < 4; i++) if (!this.slots[i]) return i; return -1; };
@@ -293,7 +299,7 @@ export class UI {
       const p = h('div', `hud-p hud-p${i}`);
       p.style.setProperty('--pc', hero.color);
       p.innerHTML = `
-        <div class="hp-head"><span class="hp-name">P${i + 1} ${hero.cls.name}</span><span class="hp-lv"></span></div>
+        <div class="hp-head"><span class="hp-name">P${i + 1} ${t(hero.cls.name)}</span><span class="hp-lv"></span></div>
         <div class="bar hpbar"><div class="fill"></div><div class="temp"></div><span></span></div>
         <div class="bar stbar"><div class="fill"></div></div>
         <div class="hp-row">
@@ -313,14 +319,14 @@ export class UI {
     const g = this.game; if (!g.run) return;
     for (const e of this.hudEls) {
       const hero = e.hero;
-      e.lv.textContent = `Lv ${hero.level}`;
-      e.ac.innerHTML = `AC ${hero.ac}`;
-      e.boons.innerHTML = hero.boons.slice(-10).map((b) => `<img class="px boon-ic" title="${b.name}" style="border-color:${RARITY[b.rarity].color}" src="${url(b.icon)}">`).join('') +
-        [...hero.pacts].map((p) => `<span class="pact" style="color:${PACTS[p].color}">${PACTS[p].name}${hero.bonds && hero.bonds.has(p) ? '⚭' : ''}</span>`).join('');
+      e.lv.textContent = t('Lv {0}', hero.level);
+      e.ac.innerHTML = t('AC {0}', hero.ac);
+      e.boons.innerHTML = hero.boons.slice(-10).map((b) => `<img class="px boon-ic" title="${t(b.name)}" style="border-color:${RARITY[b.rarity].color}" src="${url(b.icon)}">`).join('') +
+        [...hero.pacts].map((p) => `<span class="pact" style="color:${PACTS[p].color}">${t(PACTS[p].name)}${hero.bonds && hero.bonds.has(p) ? '⚭' : ''}</span>`).join('');
     }
     if (this.hudTop) {
       const r = g.run;
-      this.hudTop.innerHTML = `<span class="ember">${'<b>✹</b>'.repeat(Math.max(0, r.embers))}</span><span class="room">${this.roomName || ''} <small>${this.roomSub || ''}</small></span><span class="ash">${icon('campfire', '#ff9a40')} <b class="ashv">${r.ash}</b> Ash</span>`;
+      this.hudTop.innerHTML = `<span class="ember">${'<b>✹</b>'.repeat(Math.max(0, r.embers))}</span><span class="room">${this.roomName || ''} <small>${this.roomSub || ''}</small></span>${g.heroes.length === 1 ? `<span class="second" title="${t('Second Chance')}">${r.secondChance > 0 ? '♥ ' + t('Second Chance') : '♡'}</span>` : ''}<span class="ash">${icon('campfire', '#ff9a40')} <b class="ashv">${r.ash}</b> ${t('Ash')}</span>`;
       this.ashEl = $('.ashv', this.hudTop);
     }
   }
@@ -330,7 +336,7 @@ export class UI {
       const hero = e.hero;
       e.hp.style.width = (100 * Math.max(0, hero.hp) / hero.maxHp) + '%';
       e.temp.style.width = (100 * Math.min(1, hero.tempHp / hero.maxHp)) + '%';
-      e.hpt.textContent = hero.dead ? 'DEAD' : hero.downed ? `DOWNED ${hero.deathSaves.s}✓ ${hero.deathSaves.f}✗` : `${Math.max(0, hero.hp)}/${hero.maxHp}${hero.tempHp ? ' +' + hero.tempHp : ''}`;
+      e.hpt.textContent = hero.dead ? t('DEAD') : hero.downed ? `${t('DOWNED')} ${hero.deathSaves.s}✓ ${hero.deathSaves.f}✗` : `${Math.max(0, hero.hp)}/${hero.maxHp}${hero.tempHp ? ' +' + hero.tempHp : ''}`;
       e.st.style.width = Math.max(0, hero.stamina) + '%';
       e.st.parentElement.classList.toggle('ex', hero.exhausted);
       for (let i = 0; i < 2; i++) {
@@ -342,7 +348,7 @@ export class UI {
       e.pot.textContent = hero.potions;
       e.slots.innerHTML = hero.slotsMax ? '◆'.repeat(Math.max(0, hero.slots)) + '<i>' + '◇'.repeat(Math.max(0, hero.slotsMax - hero.slots)) + '</i>' : '';
       const conds = Object.keys(hero.cond).filter((c) => !['alert'].includes(c) || true);
-      e.conds.textContent = conds.map((c) => c.toUpperCase()).join(' · ') + (hero.exhausted ? ' · EXHAUSTED' : '');
+      e.conds.textContent = conds.map((c) => t(COND[c] || c.toUpperCase())).join(' · ') + (hero.exhausted ? ' · ' + t('EXHAUSTED') : '');
       e.el.classList.toggle('down', hero.downed || hero.dead);
     }
     if (this.ashEl && g.run) this.ashEl.textContent = g.run.ash;
@@ -350,13 +356,13 @@ export class UI {
   prompts(list) {
     for (const e of this.hudEls) {
       const p = list.find((x) => x.hero === e.hero);
-      e.prompt.innerHTML = p ? `${keycap(e.hero.ctrl.glyph.interact)} ${p.text}` : '';
+      e.prompt.innerHTML = p ? `${keycap(e.hero.ctrl.glyph.interact)} ${t(p.text)}` : '';
     }
   }
 
   bossIntro(def) {
     const b = this.layer.banner;
-    b.innerHTML = `<div class="boss-intro"><img class="px" src="${url(def.portrait)}"><div><div class="banner-sup">${def.title}</div><div class="banner-text">${def.name}</div></div></div>`;
+    b.innerHTML = `<div class="boss-intro"><img class="px" src="${url(def.portrait)}"><div><div class="banner-sup">${t(def.title)}</div><div class="banner-text">${t(def.name)}</div></div></div>`;
     b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
     clearTimeout(this.bannerTimer); this.bannerTimer = setTimeout(() => b.classList.remove('show'), 3000);
   }
@@ -364,12 +370,12 @@ export class UI {
     const el = this.layer.boss;
     if (!boss) { el.innerHTML = ''; this.bossEl = null; return; }
     if (!this.bossEl) {
-      el.innerHTML = `<div class="bossbar"><div class="bname">${boss.def.name} <small>${boss.def.title}</small></div><div class="bbar"><div class="fill"></div><div class="poise"></div></div><div class="binfo"></div></div>`;
+      el.innerHTML = `<div class="bossbar"><div class="bname">${t(boss.def.name)} <small>${t(boss.def.title)}</small></div><div class="bbar"><div class="fill"></div><div class="poise"></div></div><div class="binfo"></div></div>`;
       this.bossEl = { fill: $('.fill', el), poise: $('.poise', el), info: $('.binfo', el) };
     }
     this.bossEl.fill.style.width = (100 * Math.max(0, boss.hp) / boss.maxHp) + '%';
     this.bossEl.poise.style.width = (100 * Math.min(1, boss.poise / boss.poiseMax)) + '%';
-    this.bossEl.info.textContent = `AC ${boss.ac} · CR ${boss.def.cr} · Phase ${boss.phase}${boss.has('stagger') ? ' · STAGGERED' : ''}`;
+    this.bossEl.info.textContent = `${t('AC {0}', boss.ac)} · CR ${boss.def.cr} · ${t('Phase {0}', boss.phase)}${boss.has('stagger') ? ' · ' + t('STAGGERED') : ''}`;
   }
   bossPhase() { }
 
@@ -402,9 +408,9 @@ export class UI {
     p.count = opts.length;
     p.index = Math.min(p.index, opts.length - 1);
     const g = hero.ctrl.glyph;
-    p.el.innerHTML = `<div class="pp-head">P${hero.slot + 1} ${hero.cls.name} <small>Lv ${hero.level}</small></div><div class="pp-title">${s.title}</div>${s.sub ? `<div class="pp-sub">${s.sub()}</div>` : ''}
+    p.el.innerHTML = `<div class="pp-head">P${hero.slot + 1} ${t(hero.cls.name)} <small>${t('Lv {0}', hero.level)}</small></div><div class="pp-title">${s.title}</div>${s.sub ? `<div class="pp-sub">${s.sub()}</div>` : ''}
       <div class="pp-opts ${s.cards ? 'cards' : ''}">${opts.map((o, i) => `<div class="pp-opt ${i === p.index ? 'sel' : ''} ${o.disabled ? 'disabled' : ''}" style="${o.color ? '--rc:' + o.color : ''}">${o.html}</div>`).join('')}</div>
-      <div class="pp-keys">${keycap(g.move)} choose · ${keycap(g.attack)} confirm ${s.extraKey ? '· ' + s.extraKey(g) : ''} ${s.canClose !== false ? '· ' + keycap(g.back || 'ESC') + ' close' : ''}</div>`;
+      <div class="pp-keys">${keycap(g.move)} ${t('choose')} · ${keycap(g.attack)} ${t('confirm')} ${s.extraKey ? '· ' + s.extraKey(g) : ''} ${s.canClose !== false ? '· ' + keycap(g.back || 'ESC') + ' ' + t('close') : ''}</div>`;
   }
   panelInput() {
     for (const p of [...this.panels.values()]) {
@@ -424,17 +430,17 @@ export class UI {
   boonCard(b, hero) {
     const r = RARITY[b.rarity], pact = PACTS[b.pact];
     const have = hero.boons.filter((x) => x.pact === b.pact).length;
-    return `<div class="bc-top"><img class="px bc-ic" src="${url(b.icon)}"><div><div class="bc-name">${b.name}</div><div class="bc-rar" style="color:${r.color}">${r.name}</div></div></div>
-      <div class="bc-desc">${b.desc}</div><div class="bc-pact" style="color:${pact.color}">${pact.name} pact ${have ? `(${have}/3)` : ''}</div>`;
+    return `<div class="bc-top"><img class="px bc-ic" src="${url(b.icon)}"><div><div class="bc-name">${t(b.name)}</div><div class="bc-rar" style="color:${r.color}">${t(r.name)}</div></div></div>
+      <div class="bc-desc">${t(b.desc)}</div><div class="bc-pact" style="color:${pact.color}">${t('{0} pact', t(pact.name))} ${have ? `(${have}/3)` : ''}</div>`;
   }
 
   openDraft(hero, boons, then = null) {
     let current = boons;
     this.openPanel(hero, {
-      title: 'Choose a Boon', cards: true, canClose: false,
-      sub: () => `Pacts: ${Object.entries(PACTS).map(([k, p]) => { const n = hero.boons.filter((b) => b.pact === k).length; return n ? `<span style="color:${p.color}">${p.name} ${n}</span>` : ''; }).join(' ') || '—'}`,
+      title: t('Choose a Boon'), cards: true, canClose: false,
+      sub: () => `${t('Pacts')}: ${Object.entries(PACTS).map(([k, p]) => { const n = hero.boons.filter((b) => b.pact === k).length; return n ? `<span style="color:${p.color}">${t(p.name)} ${n}</span>` : ''; }).join(' ') || '—'}`,
       options: () => current.map((b) => ({ html: this.boonCard(b, hero), color: RARITY[b.rarity].color, action: () => { this.game.grantBoon(hero, b); if (then) then(); return false; } })),
-      extraKey: (g) => hero.rerolls > 0 ? `${keycap(g.skill2)} reroll (${hero.rerolls})` : '',
+      extraKey: (g) => hero.rerolls > 0 ? `${keycap(g.skill2)} ${t('reroll')} (${hero.rerolls})` : '',
       extra: () => { if (hero.rerolls > 0) { hero.rerolls--; current = draftBoons(hero, { depth: this.game.run.depthIndex }); audio.play('book', { vol: 0.6 }); } },
     });
   }
@@ -442,14 +448,14 @@ export class UI {
   openShrine(hero) {
     const g = this.game;
     this.openPanel(hero, {
-      title: 'Ember Shrine',
-      sub: () => `Party Ash: <b>${g.run.ash}</b> · HP ${hero.hp}/${hero.maxHp}`,
+      title: t('Ember Shrine'),
+      sub: () => `${t('Party Ash')}: <b>${g.run.ash}</b> · ${t('HP')} ${hero.hp}/${hero.maxHp}`,
       options: () => {
         const cost = LEVEL_COST[hero.level];
         const next = hero.cls.features[hero.level + 1];
-        const o = [{ html: hero.level >= MAX_LEVEL ? 'Level MAX' : `Level up to ${hero.level + 1} — <b>${cost}</b> Ash<br><small>+HP${next ? ', ' + next : ''}${(hero.level + 1) % 4 === 0 ? ', + a feat draft' : ''}</small>`, disabled: hero.level >= MAX_LEVEL || g.run.ash < cost, action: () => { g.levelUp(hero); return true; } }];
-        o.push({ html: `Kindle an Ember — <b>${900 + 300 * g.run.depthIndex}</b> Ash<br><small>+1 party life</small>`, disabled: g.run.ash < 900 + 300 * g.run.depthIndex, action: () => { g.run.ash -= 900 + 300 * g.run.depthIndex; g.run.embers++; audio.play('shrine'); this.refreshHud(); return true; } });
-        o.push({ html: 'Leave', action: () => false });
+        const o = [{ html: hero.level >= MAX_LEVEL ? t('Level MAX') : `${t('Level up to {0}', hero.level + 1)} — <b>${cost}</b> ${t('Ash')}<br><small>+${t('HP')}${next ? ', ' + t(next) : ''}${(hero.level + 1) % 4 === 0 ? ', ' + t('+ a feat draft') : ''}</small>`, disabled: hero.level >= MAX_LEVEL || g.run.ash < cost, action: () => { g.levelUp(hero); return true; } }];
+        o.push({ html: `${t('Kindle an Ember')} — <b>${900 + 300 * g.run.depthIndex}</b> ${t('Ash')}<br><small>${t('+1 party life')}</small>`, disabled: g.run.ash < 900 + 300 * g.run.depthIndex, action: () => { g.run.ash -= 900 + 300 * g.run.depthIndex; g.run.embers++; audio.play('shrine'); this.refreshHud(); return true; } });
+        o.push({ html: t('Leave'), action: () => false });
         return o;
       },
     });
@@ -459,12 +465,12 @@ export class UI {
     const g = this.game;
     if (!g.shopStock) g.shopStock = new Set();
     this.openPanel(hero, {
-      title: 'Ossa the Ash-Merchant',
-      sub: () => `Party Ash: <b>${g.run.ash}</b>`,
+      title: t('Ossa the Ash-Merchant'),
+      sub: () => `${t('Party Ash')}: <b>${g.run.ash}</b>`,
       options: () => SHOP_ITEMS.map((it) => {
         const cost = Math.round(it.cost * (1 + g.run.depthIndex * 0.25));
-        return { html: `<img class="px shop-ic" src="${url(it.icon)}"> <b>${it.name}</b> — ${cost} Ash<br><small>${it.desc}</small>`, disabled: g.run.ash < cost, action: () => { g.run.ash -= cost; this.buy(it.id, hero); audio.play('coins', { vol: 0.8 }); this.refreshHud(); return it.id !== 'boon'; } };
-      }).concat([{ html: 'Leave', action: () => false }]),
+        return { html: `<img class="px shop-ic" src="${url(it.icon)}"> <b>${t(it.name)}</b> — ${cost} ${t('Ash')}<br><small>${t(it.desc)}</small>`, disabled: g.run.ash < cost, action: () => { g.run.ash -= cost; this.buy(it.id, hero); audio.play('coins', { vol: 0.8 }); this.refreshHud(); return it.id !== 'boon'; } };
+      }).concat([{ html: t('Leave'), action: () => false }]),
     });
   }
   buy(id, hero) {
@@ -475,18 +481,18 @@ export class UI {
     if (id === 'reroll') for (const x of g.heroes) x.rerolls++;
     if (id === 'boon') setTimeout(() => this.openDraft(hero, draftBoons(hero, { depth: g.run.depthIndex, minRarity: 'uncommon' })), 50);
     if (id === 'scroll') for (const x of g.heroes) { x.slots = x.slotsMax; x.heal(Math.ceil(x.maxHp / 2)); }
-    g.log(`${hero.label} buys ${SHOP_ITEMS.find((i) => i.id === id).name}.`, hero.color);
+    g.log(t('{0} buys {1}.', hero.label, t(SHOP_ITEMS.find((i) => i.id === id).name)), hero.color);
   }
 
   openAltar(hero) {
     const g = this.game;
-    if (g.altarRolled.has(hero)) { this.toast(`${hero.label} has already tempted fate here.`); return; }
+    if (g.altarRolled.has(hero)) { this.toast(t('{0} has already tempted fate here.', hero.label)); return; }
     this.openPanel(hero, {
-      title: "The Dicer's Altar",
-      sub: () => 'Roll the d20. <b>1</b>: a curse. <b>2–9</b>: Ash. <b>10–17</b>: a boon. <b>18–19</b>: a rare boon. <b>20</b>: legendary.',
+      title: t("The Dicer's Altar"),
+      sub: () => t('altar.rules'),
       options: () => [
-        { html: `${icon('dice-twenty-faces-twenty', '#ff7ad0')} Roll the bones`, action: () => { g.altarRolled.add(hero); this.altarRoll(hero); return false; } },
-        { html: 'Walk away', action: () => false },
+        { html: `${icon('dice-twenty-faces-twenty', '#ff7ad0')} ${t('Roll the bones')}`, action: () => { g.altarRolled.add(hero); this.altarRoll(hero); return false; } },
+        { html: t('Walk away'), action: () => false },
       ],
     });
   }
@@ -497,11 +503,11 @@ export class UI {
     setTimeout(() => {
       if (r === 1) {
         hero.boons.push({ id: 'curse_' + Math.random(), name: 'Hexed', rarity: 'common', pact: 'grave', icon: 'assets/sprites/crawl/item_amulet_i-rage.png', desc: '-1 AC, -1 to hit', mods: { ac: -1, toHit: -1 } }); hero.recompute();
-        g.ui.banner('Cursed', `${hero.label} is Hexed (-1 AC, -1 to hit)`, 2); audio.play('error');
-      } else if (r < 10) { const a = 40 * r + 60 * g.run.depthIndex; g.run.ash += a; g.ui.banner('Fortune', `+${a} Ash`, 1.6); audio.play('coins'); }
+        g.ui.banner(t('Cursed'), t('{0} is Hexed (-1 AC, -1 to hit)', hero.label), 2); audio.play('error');
+      } else if (r < 10) { const a = 40 * r + 60 * g.run.depthIndex; g.run.ash += a; g.ui.banner(t('Fortune'), `+${a} ${t('Ash')}`, 1.6); audio.play('coins'); }
       else if (r < 18) this.openDraft(hero, draftBoons(hero, { depth: g.run.depthIndex }));
       else if (r < 20) this.openDraft(hero, draftBoons(hero, { depth: g.run.depthIndex, minRarity: 'rare' }));
-      else { this.openDraft(hero, draftBoons(hero, { minRarity: 'legendary' })); g.ui.banner('NATURAL 20', 'The dice adore you', 2); }
+      else { this.openDraft(hero, draftBoons(hero, { minRarity: 'legendary' })); g.ui.banner(t('NATURAL 20'), t('The dice adore you'), 2); }
       this.refreshHud();
     }, 900);
   }
@@ -510,10 +516,10 @@ export class UI {
   showPause() {
     this.onBack = () => this.game.resume();
     this.setScreen('pause', () => this.menu([
-      { label: 'Resume', action: () => this.game.resume() },
-      { label: 'Options', action: () => this.showOptions(() => this.showPause()) },
-      { label: 'Abandon run', action: () => { this.game.paused = false; this.game.abandon(); } },
-    ], { title: 'Paused', sub: this.game.run ? `Seed ${this.game.run.seed} · ${this.game.run.depth.name} · Room ${this.game.run.roomIndex}` : '' }));
+      { label: t('Resume'), action: () => this.game.resume() },
+      { label: t('Options'), action: () => this.showOptions(() => this.showPause()) },
+      { label: t('Abandon run'), action: () => { this.game.paused = false; this.game.abandon(); } },
+    ], { title: t('Paused'), sub: this.game.run ? `${t('Seed {0}', this.game.run.seed)} · ${t(this.game.run.depth.name)} · ${t('Room {0}', this.game.run.roomIndex)}` : '' }));
   }
 
   showEnd(won, marks) {
@@ -523,11 +529,11 @@ export class UI {
     const mins = Math.floor((Date.now() - r.startTime) / 60000);
     this.setScreen('end', () => {
       const w = h('div', 'menu end');
-      w.innerHTML = `<div class="menu-title ${won ? 'won' : 'lost'}">${won ? 'The Oath is Fulfilled' : 'The Oath is Broken'}</div>
-        <div class="menu-sub">${won ? 'Cindermaw lies cold. The Abyss sleeps.' : `Fell in ${r.depth.name}, room ${r.roomIndex}.`} · ${mins} min · ${r.roomsCleared} rooms · ${r.bossesSlain} bosses · seed ${r.seed}</div>
-        <div class="end-heroes">${g.heroes.map((x) => `<div class="eh" style="--pc:${x.color}"><b>P${x.slot + 1} ${x.cls.name}</b> Lv ${x.level}<br>Damage ${x.stats.dealt} · Kills ${x.stats.kills}<br>Crits ${x.stats.crits} · Nat 20s ${x.stats.nat20}<br>Revives ${x.stats.revives} · Downs ${x.stats.downs}<div class="eb">${x.boons.map((b) => `<img class="px" title="${b.name}" src="${url(b.icon)}">`).join('')}</div></div>`).join('')}</div>
-        <div class="marks">+${marks} Oath Marks ✦ <small>(total ${meta.data.marks})</small></div>`;
-      w.appendChild(this.menu([{ label: 'Return to the Shrine', action: () => this.game.toTitle() }]));
+      w.innerHTML = `<div class="menu-title ${won ? 'won' : 'lost'}">${won ? t('The Oath is Fulfilled') : t('The Oath is Broken')}</div>
+        <div class="menu-sub">${won ? t('Cindermaw lies cold. The Abyss sleeps.') : t('Fell in {0}, room {1}.', t(r.depth.name), r.roomIndex)} · ${t('{0} min · {1} rooms · {2} bosses · seed {3}', mins, r.roomsCleared, r.bossesSlain, r.seed)}</div>
+        <div class="end-heroes">${g.heroes.map((x) => `<div class="eh" style="--pc:${x.color}"><b>P${x.slot + 1} ${t(x.cls.name)}</b> ${t('Lv {0}', x.level)}<br>${t('Damage')} ${x.stats.dealt} · ${t('Kills')} ${x.stats.kills}<br>${t('Crits')} ${x.stats.crits} · ${t('Nat 20s')} ${x.stats.nat20}<br>${t('Revives')} ${x.stats.revives} · ${t('Downs')} ${x.stats.downs}<div class="eb">${x.boons.map((b) => `<img class="px" title="${t(b.name)}" src="${url(b.icon)}">`).join('')}</div></div>`).join('')}</div>
+        <div class="marks">+${marks} ${t('Oath Marks')} ✦ <small>(${t('total {0}', meta.data.marks)})</small></div>`;
+      w.appendChild(this.menu([{ label: t('Return to the Shrine'), action: () => this.game.toTitle() }]));
       return w;
     });
     this.onBack = null;

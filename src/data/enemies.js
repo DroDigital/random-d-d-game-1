@@ -91,7 +91,7 @@ export const BOSSES = {
     saves: { str: 6, con: 6 }, vuln: ['bludgeoning'], immune: ['poison'], tags: ['undead'], music: 'boss2' },
   wyrm: { name: 'Cindermaw', title: 'the Ember Wyrm', model: 'monsters/Flying_Dragon_Evolved.gltf', anim: 'flying', height: 7.5, hover: 1.0,
     portrait: 'assets/sprites/crawl/mon_dragons_shadow_dragon.png', cr: 10, ac: 18, hp: 380, atk: 9, dmg: '2d10+6', type: 'fire', speed: 3.8, poise: 160, dc: 16,
-    saves: { dex: 4, con: 7, wis: 4 }, immune: ['fire'], tags: ['dragon'], music: 'boss' },
+    saves: { dex: 4, con: 7, wis: 4 }, immune: ['fire'], tags: ['dragon'], music: 'boss3' },
 };
 
 export const AFFIXES = {

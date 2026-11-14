@@ -45,7 +45,7 @@ const MUSIC = {
   title: 'music/na_intro', select: 'music/na_curse', crypt: 'music/na_crypt', ossuary: 'music/na_dark_castle',
   abyss: 'music/na_final_area', boss: 'music/na_fight', boss2: 'music/na_fight2', shrine: 'music/na_melancholia',
   gameover: 'music/na_lament', victory: 'music/retro_mystic', peddler: 'music/flowing_rocks', altar: 'music/infinite_descent',
-  sad: 'music/sad_descent',
+  sad: 'music/sad_descent', boss3: 'music/na_fight',
 };
 
 const howls = {};

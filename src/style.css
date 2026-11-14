@@ -1,10 +1,11 @@
 :root {
+  --cjk: 'Ashen SC', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', 'Noto Sans CJK SC', 'Microsoft YaHei';
   --ink: #0b0a0f; --bone: #efe6cf; --ash: #9c917e; --ember: #ff9a40; --blood: #c0302a; --gold: #ffd28a;
   --panel: rgba(10, 8, 12, 0.88);
   --border: url('../assets/ui/border-011.png');
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: var(--bone); font-family: 'Fell', Georgia, serif; user-select: none; }
+html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color: var(--bone); font-family: 'Fell', var(--cjk), Georgia, serif; user-select: none; }
 #view, #overlay { position: fixed; inset: 0; width: 100vw; height: 100vh; image-rendering: pixelated; image-rendering: crisp-edges; }
 #overlay { pointer-events: none; }
 #ui { position: fixed; inset: 0; pointer-events: none; }
@@ -13,17 +14,17 @@ html, body { margin: 0; height: 100%; background: #000; overflow: hidden; color:
 .layer-screen.on { display: flex; }
 small { opacity: 0.7; font-size: 0.8em; }
 img.px { image-rendering: pixelated; }
-.key { display: inline-block; font-family: VT323, monospace; font-size: 15px; line-height: 15px; padding: 1px 5px; border: 1px solid var(--ash); border-bottom-width: 2px; border-radius: 3px; color: var(--bone); background: #1a161c; margin: 0 1px; }
+.key { display: inline-block; font-family: VT323, var(--cjk), monospace; font-size: 15px; line-height: 15px; padding: 1px 5px; border: 1px solid var(--ash); border-bottom-width: 2px; border-radius: 3px; color: var(--bone); background: #1a161c; margin: 0 1px; }
 i.gi { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.25em; background: var(--c); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
 
 /* boot */
 #boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #050407; z-index: 50; transition: opacity 0.8s; }
 #boot.done { opacity: 0; pointer-events: none; }
-.boot-title { font-family: 'Fell SC', serif; font-size: 64px; letter-spacing: 0.2em; color: var(--bone); text-shadow: 0 0 24px #ff7a2f88; }
+.boot-title { font-family: 'Fell SC', var(--cjk), serif; font-size: 64px; letter-spacing: 0.2em; color: var(--bone); text-shadow: 0 0 24px #ff7a2f88; }
 .boot-sub { font-style: italic; color: var(--ash); margin: 8px 0 22px; }
 .boot-bar { width: 320px; height: 6px; background: #1a1418; border: 1px solid #3a2f2a; }
 #boot-fill { height: 100%; width: 0; background: linear-gradient(90deg, #8a2a10, var(--ember)); transition: width 0.2s; }
-.boot-note { margin-top: 12px; font-family: VT323, monospace; color: var(--ash); font-size: 18px; }
+.boot-note { margin-top: 12px; font-family: VT323, var(--cjk), monospace; color: var(--ash); font-size: 18px; }
 
 /* fade / banners / toast */
 .layer-fade { background: #000; opacity: 0; transition: opacity 0.35s; }
@@ -31,8 +32,8 @@ i.gi { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.25
 .layer-banner { display: flex; align-items: flex-start; justify-content: center; padding-top: 16vh; opacity: 0; transition: opacity 0.4s; }
 .layer-banner.show { opacity: 1; }
 .banner-in, .boss-intro { text-align: center; padding: 14px 60px; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.75) 20%, rgba(0,0,0,0.75) 80%, transparent); }
-.banner-sup { font-family: 'Fell SC', serif; color: var(--ember); letter-spacing: 0.35em; font-size: 18px; text-transform: uppercase; }
-.banner-text { font-family: 'Fell SC', serif; font-size: 46px; letter-spacing: 0.08em; color: var(--bone); text-shadow: 0 2px 0 #000, 0 0 30px #ff7a2f55; }
+.banner-sup { font-family: 'Fell SC', var(--cjk), serif; color: var(--ember); letter-spacing: 0.35em; font-size: 18px; text-transform: uppercase; }
+.banner-text { font-family: 'Fell SC', var(--cjk), serif; font-size: 46px; letter-spacing: 0.08em; color: var(--bone); text-shadow: 0 2px 0 #000, 0 0 30px #ff7a2f55; }
 .boss-intro { display: flex; align-items: center; gap: 22px; }
 .boss-intro img { width: 128px; height: 128px; filter: drop-shadow(0 0 12px #ff3a1a); }
 .boss-intro .banner-text { font-size: 58px; }
@@ -41,7 +42,7 @@ i.gi { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.25
 
 /* menus */
 .menu { pointer-events: auto; min-width: 520px; max-width: 1100px; max-height: 92vh; overflow: auto; padding: 34px 46px; background: var(--panel); border: 24px solid transparent; border-image: var(--border) 16 fill / 24px / 0 stretch; border-image-outset: 0; text-align: center; }
-.menu-title { font-family: 'Fell SC', serif; font-size: 44px; letter-spacing: 0.08em; margin-bottom: 6px; }
+.menu-title { font-family: 'Fell SC', var(--cjk), serif; font-size: 44px; letter-spacing: 0.08em; margin-bottom: 6px; }
 .menu-title.won { color: var(--gold); } .menu-title.lost { color: #ff6a5a; }
 .menu-sub { color: var(--ash); font-style: italic; margin-bottom: 18px; }
 .menu-list { display: flex; flex-direction: column; gap: 4px; }
@@ -51,23 +52,23 @@ i.gi { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.25
 .menu-item.sel::before { content: '✹ '; color: var(--ember); }
 .menu-item.sel::after { content: ' ✹'; color: var(--ember); }
 .menu-item.disabled { opacity: 0.4; }
-.menu-item .val { font-family: VT323, monospace; color: var(--gold); margin-left: 10px; }
-.menu-item .cost { font-family: VT323; color: var(--gold); } .menu-item .owned { color: #7dff8a; }
+.menu-item .val { font-family: VT323, var(--cjk), monospace; color: var(--gold); margin-left: 10px; }
+.menu-item .cost { font-family: VT323, var(--cjk), monospace; color: var(--gold); } .menu-item .owned { color: #7dff8a; }
 
 .title-screen { display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 100%; width: 100%; padding: 8vh 0 3vh; }
 .title-logo { text-align: center; }
-.title-logo .t1 { font-family: 'Fell SC', serif; font-size: clamp(48px, 9vw, 120px); letter-spacing: 0.16em; color: var(--bone); text-shadow: 0 4px 0 #000, 0 0 40px #ff7a2f66, 0 0 80px #ff3a1a33; }
+.title-logo .t1 { font-family: 'Fell SC', var(--cjk), serif; font-size: clamp(48px, 9vw, 120px); letter-spacing: 0.16em; color: var(--bone); text-shadow: 0 4px 0 #000, 0 0 40px #ff7a2f66, 0 0 80px #ff3a1a33; }
 .title-logo .t2 { font-style: italic; color: var(--ash); font-size: 20px; margin-top: -6px; }
 .title-menu { min-width: 380px; padding: 18px 36px; background: rgba(6,5,8,0.7); }
-.title-foot { color: var(--ash); font-family: VT323, monospace; font-size: 17px; text-align: center; text-shadow: 0 1px 2px #000; }
+.title-foot { color: var(--ash); font-family: VT323, var(--cjk), monospace; font-size: 17px; text-align: center; text-shadow: 0 1px 2px #000; }
 
 .help { text-align: left; max-width: 1080px; }
 .help .menu-title, .help .menu-sub { text-align: center; }
 .controls { margin: 8px auto 16px; border-collapse: collapse; font-size: 17px; }
 .controls td, .controls th { padding: 3px 14px; text-align: center; }
-.controls th { font-family: 'Fell SC'; color: var(--ember); font-weight: normal; }
+.controls th { font-family: 'Fell SC', var(--cjk), serif; color: var(--ember); font-weight: normal; }
 .help-cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; font-size: 15.5px; line-height: 1.4; }
-.help h3, .credits h3 { font-family: 'Fell SC'; color: var(--ember); font-weight: normal; margin: 6px 0; letter-spacing: 0.05em; }
+.help h3, .credits h3 { font-family: 'Fell SC', var(--cjk), serif; color: var(--ember); font-weight: normal; margin: 6px 0; letter-spacing: 0.05em; }
 .credits { font-size: 16px; line-height: 1.45; }
 
 /* character select */
@@ -76,37 +77,37 @@ i.gi { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.25
 .pcard { min-height: 470px; padding: 14px; background: rgba(8,6,10,0.82); border: 2px solid #2a2228; display: flex; flex-direction: column; gap: 6px; text-align: center; }
 .pcard.joined { border-color: var(--pc); box-shadow: 0 0 22px color-mix(in srgb, var(--pc) 40%, transparent); }
 .pcard.ready { background: linear-gradient(180deg, color-mix(in srgb, var(--pc) 20%, #0a080c), rgba(8,6,10,0.9)); }
-.pslot { font-family: VT323; font-size: 24px; color: var(--pc); }
+.pslot { font-family: VT323, var(--cjk), monospace; font-size: 24px; color: var(--pc); }
 .pjoin { margin: auto; color: var(--ash); font-style: italic; font-size: 20px; animation: pulse 1.6s infinite; }
 @keyframes pulse { 50% { opacity: 0.35; } }
-.pclass { font-family: 'Fell SC'; font-size: 32px; }
+.pclass { font-family: 'Fell SC', var(--cjk), serif; font-size: 32px; }
 .ptitle { font-style: italic; color: var(--ash); margin-top: -6px; }
-.plock { color: #ff6a5a; font-family: VT323; font-size: 18px; }
-.pstats { font-family: VT323; font-size: 20px; color: var(--gold); }
-.pabil { display: grid; grid-template-columns: repeat(6, 1fr); font-family: VT323; font-size: 18px; }
+.plock { color: #ff6a5a; font-family: VT323, var(--cjk), monospace; font-size: 18px; }
+.pstats { font-family: VT323, var(--cjk), monospace; font-size: 20px; color: var(--gold); }
+.pabil { display: grid; grid-template-columns: repeat(6, 1fr); font-family: VT323, var(--cjk), monospace; font-size: 18px; }
 .pabil b { display: block; font-size: 13px; color: var(--ash); font-weight: normal; }
 .pblurb { font-size: 15px; font-style: italic; min-height: 40px; }
 .pskills { display: flex; flex-direction: column; gap: 6px; text-align: left; font-size: 14.5px; }
 .pskills i.gi { width: 26px; height: 26px; float: left; margin-right: 8px; }
 .pskin { font-size: 14px; color: var(--ash); margin-top: auto; }
-.pready { font-family: 'Fell SC'; font-size: 22px; color: var(--pc); }
+.pready { font-family: 'Fell SC', var(--cjk), serif; font-size: 22px; color: var(--pc); }
 .select-foot { margin-top: 12px; font-style: italic; color: var(--ash); font-size: 18px; }
 
 /* HUD */
 .hud-top { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); display: flex; gap: 26px; align-items: center; padding: 4px 22px; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.7) 15%, rgba(0,0,0,0.7) 85%, transparent); font-size: 18px; white-space: nowrap; }
 .hud-top .ember b { color: var(--ember); text-shadow: 0 0 8px #ff7a2f; font-size: 22px; margin: 0 2px; }
-.hud-top .room { font-family: 'Fell SC'; }
-.hud-top .ash b { font-family: VT323; font-size: 24px; color: var(--ember); }
+.hud-top .room { font-family: 'Fell SC', var(--cjk), serif; }
+.hud-top .ash b { font-family: VT323, var(--cjk), monospace; font-size: 24px; color: var(--ember); }
 .hud-p { position: absolute; width: 300px; padding: 8px 10px; background: rgba(6,5,8,0.72); border-left: 4px solid var(--pc); font-size: 14px; }
 .hud-p0 { left: 10px; bottom: 10px; } .hud-p1 { right: 10px; bottom: 10px; border-left: none; border-right: 4px solid var(--pc); }
 .hud-p2 { left: 10px; top: 46px; } .hud-p3 { right: 10px; top: 46px; border-left: none; border-right: 4px solid var(--pc); }
 .hud-p.down { filter: grayscale(0.8); }
-.hp-head { display: flex; justify-content: space-between; font-family: 'Fell SC'; font-size: 17px; color: var(--pc); }
-.hp-lv { font-family: VT323; font-size: 18px; color: var(--gold); }
+.hp-head { display: flex; justify-content: space-between; font-family: 'Fell SC', var(--cjk), serif; font-size: 17px; color: var(--pc); }
+.hp-lv { font-family: VT323, var(--cjk), monospace; font-size: 18px; color: var(--gold); }
 .bar { position: relative; height: 14px; background: #1a1012; border: 1px solid #000; margin: 3px 0; }
 .bar .fill { position: absolute; inset: 0; width: 100%; background: linear-gradient(180deg, #e0463a, #8a1a14); transition: width 0.15s; }
 .bar .temp { position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: rgba(140, 200, 255, 0.6); }
-.bar span { position: absolute; inset: 0; font-family: VT323; font-size: 15px; line-height: 13px; text-align: center; text-shadow: 0 1px 1px #000; }
+.bar span { position: absolute; inset: 0; font-family: VT323, var(--cjk), monospace; font-size: 15px; line-height: 13px; text-align: center; text-shadow: 0 1px 1px #000; }
 .stbar { height: 6px; } .stbar .fill { background: linear-gradient(180deg, #d8c87a, #8a7a2a); transition: width 0.05s; }
 .stbar.ex .fill { background: #6a5a3a; }
 .hp-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
@@ -114,30 +115,30 @@ i.gi { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.25
 .sk i.gi { width: 26px; height: 26px; }
 .sk .cd { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.72); }
 .sk.noslot { opacity: 0.35; }
-.sk .kc { position: absolute; right: 1px; bottom: -2px; font-family: VT323; font-size: 12px; color: var(--ash); text-shadow: 0 1px 1px #000; }
-.pot { font-family: VT323; font-size: 20px; display: flex; align-items: center; gap: 2px; }
+.sk .kc { position: absolute; right: 1px; bottom: -2px; font-family: VT323, var(--cjk), monospace; font-size: 12px; color: var(--ash); text-shadow: 0 1px 1px #000; }
+.pot { font-family: VT323, var(--cjk), monospace; font-size: 20px; display: flex; align-items: center; gap: 2px; }
 .slots { font-size: 13px; color: #b9a0ff; letter-spacing: 1px; } .slots i { color: #4a3a6a; font-style: normal; }
-.ac { margin-left: auto; font-family: VT323; font-size: 18px; color: #a8c8ff; }
+.ac { margin-left: auto; font-family: VT323, var(--cjk), monospace; font-size: 18px; color: #a8c8ff; }
 .hp-boons { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 2px; align-items: center; min-height: 0; }
 .boon-ic { width: 22px; height: 22px; border: 1px solid; background: #0a080c; }
-.pact { font-family: VT323; font-size: 15px; margin-left: 4px; }
-.hp-conds { font-family: VT323; font-size: 14px; color: #ffb347; min-height: 0; }
+.pact { font-family: VT323, var(--cjk), monospace; font-size: 15px; margin-left: 4px; }
+.hp-conds { font-family: VT323, var(--cjk), monospace; font-size: 14px; color: #ffb347; min-height: 0; }
 .hp-prompt { font-size: 14px; font-style: italic; color: var(--gold); min-height: 0; }
 
-.layer-log { position: absolute; top: auto; right: auto; left: 50%; transform: translateX(-50%); bottom: 8px; width: 560px; font-family: VT323, monospace; font-size: 15px; line-height: 15px; text-align: center; text-shadow: 0 1px 2px #000, 0 0 4px #000; opacity: 0.85; }
+.layer-log { position: absolute; top: auto; right: auto; left: 50%; transform: translateX(-50%); bottom: 8px; width: 560px; font-family: VT323, var(--cjk), monospace; font-size: 15px; line-height: 15px; text-align: center; text-shadow: 0 1px 2px #000, 0 0 4px #000; opacity: 0.85; }
 
 .bossbar { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); width: min(720px, 60vw); text-align: center; }
-.bname { font-family: 'Fell SC'; font-size: 26px; text-shadow: 0 2px 0 #000; }
+.bname { font-family: 'Fell SC', var(--cjk), serif; font-size: 26px; text-shadow: 0 2px 0 #000; }
 .bbar { position: relative; height: 12px; background: #1a0e10; border: 1px solid #000; outline: 1px solid #5a4030; }
 .bbar .fill { position: absolute; inset: 0; background: linear-gradient(180deg, #ff5a3a, #8a1a10); transition: width 0.2s; }
 .bbar .poise { position: absolute; left: 0; bottom: -4px; height: 3px; background: #ffb347; }
-.binfo { font-family: VT323; font-size: 16px; color: var(--ash); margin-top: 4px; }
+.binfo { font-family: VT323, var(--cjk), monospace; font-size: 16px; color: var(--ash); margin-top: 4px; }
 
 /* per-player panels */
 .layer-panels { display: flex; justify-content: center; align-items: center; gap: 14px; padding: 0 12px; }
 .ppanel { pointer-events: auto; width: min(560px, 46vw); max-height: 80vh; overflow: auto; padding: 16px 20px; background: var(--panel); border: 3px solid var(--pc); box-shadow: 0 0 40px #000, 0 0 18px color-mix(in srgb, var(--pc) 35%, transparent); }
-.pp-head { font-family: VT323; font-size: 20px; color: var(--pc); }
-.pp-title { font-family: 'Fell SC'; font-size: 30px; }
+.pp-head { font-family: VT323, var(--cjk), monospace; font-size: 20px; color: var(--pc); }
+.pp-title { font-family: 'Fell SC', var(--cjk), serif; font-size: 30px; }
 .pp-sub { color: var(--ash); font-size: 15px; margin-bottom: 8px; }
 .pp-opts { display: flex; flex-direction: column; gap: 6px; }
 .pp-opts.cards { flex-direction: row; gap: 8px; }
@@ -147,16 +148,23 @@ i.gi { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.25
 .pp-opt.disabled { opacity: 0.4; }
 .bc-top { display: flex; gap: 8px; align-items: center; }
 .bc-ic { width: 48px; height: 48px; background: #000; border: 1px solid #333; }
-.bc-name { font-family: 'Fell SC'; font-size: 18px; line-height: 1.05; }
-.bc-rar { font-family: VT323; font-size: 16px; }
+.bc-name { font-family: 'Fell SC', var(--cjk), serif; font-size: 18px; line-height: 1.05; }
+.bc-rar { font-family: VT323, var(--cjk), monospace; font-size: 16px; }
 .bc-desc { font-size: 14.5px; line-height: 1.3; flex: 1; }
-.bc-pact { font-family: VT323; font-size: 16px; }
+.bc-pact { font-family: VT323, var(--cjk), monospace; font-size: 16px; }
 .shop-ic { width: 32px; height: 32px; vertical-align: middle; }
 .pp-keys { margin-top: 10px; font-size: 13px; color: var(--ash); }
 
 .end .end-heroes { display: flex; gap: 12px; justify-content: center; margin: 12px 0; flex-wrap: wrap; }
-.end .eh { width: 230px; padding: 10px; border-top: 3px solid var(--pc); background: #0c0a0e; font-family: VT323; font-size: 17px; text-align: left; }
-.end .eh b { font-family: 'Fell SC'; font-size: 19px; color: var(--pc); font-weight: normal; }
+.end .eh { width: 230px; padding: 10px; border-top: 3px solid var(--pc); background: #0c0a0e; font-family: VT323, var(--cjk), monospace; font-size: 17px; text-align: left; }
+.end .eh b { font-family: 'Fell SC', var(--cjk), serif; font-size: 19px; color: var(--pc); font-weight: normal; }
 .end .eb img { width: 22px; height: 22px; }
-.end .marks { font-family: 'Fell SC'; font-size: 26px; color: var(--gold); margin: 8px 0; }
+.end .marks { font-family: 'Fell SC', var(--cjk), serif; font-size: 26px; color: var(--gold); margin: 8px 0; }
 @media (max-width: 1100px) { .hud-p { width: 240px; } .help-cols { grid-template-columns: 1fr; } .pcard { min-height: 0; } }
+.menu-item.sel:has(small)::after { content: none; }
+
+.hud-top .second { font-family: VT323, var(--cjk), monospace; font-size: 18px; color: #ffb060; }
+
+html[lang="ja"] { --cjk: 'Ashen JP', 'Noto Serif CJK JP', 'Source Han Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', 'MS Mincho', 'Noto Sans CJK JP', 'Meiryo'; }
+html.cjk .pskills, html.cjk .bc-desc, html.cjk .pblurb, html.cjk .help p { line-height: 1.5; }
+html.cjk .menu-title, html.cjk .banner-text, html.cjk .title-logo .t2 { letter-spacing: 0.04em; }

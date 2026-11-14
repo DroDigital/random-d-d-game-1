@@ -8,8 +8,10 @@ import { heroAttack, heroAutoHit, heroSaveDamage, applyDamage, typeColor } from 
 import { audio } from '../core/audio.js';
 import { input } from '../core/input.js';
 import { frand } from '../core/rules.js';
+import { t } from '../i18n/index.js';
 
 const STAM_MAX = 100;
+export const RAISE_TIME = 2.6; // seconds of holding Interact to raise a slain ally
 const DODGE_COST = 24;
 
 export class Hero extends Actor {
@@ -22,7 +24,6 @@ export class Hero extends Actor {
     this.skin = skin;
     this.color = ['#e05a47', '#4f8fe0', '#59c06b', '#e8c547'][slot];
     this.diceColor = DICE_COLORS[slot];
-    this.label = `P${slot + 1} ${this.cls.name}`;
     this.level = 1;
     this.boons = [];
     this.flags = new Set();
@@ -54,6 +55,7 @@ export class Hero extends Actor {
     this.slots = this.slotsMax;
   }
 
+  get label() { return `P${this.slot + 1} ${t(this.cls.name)}`; }
   get ctrl() { return input.byId(this.controllerId); }
   get canAct() { return this.alive && !this.downed && !this.dead; }
   get invulnerable() { return this.iframes > 0 || this.game.cinematic; }
@@ -205,21 +207,44 @@ export class Hero extends Actor {
   interrupt() { this.queued = null; if (this.castFx) this.castFx = null; }
 
   goDown() {
+    // solo: a second chance once per depth (recharged at shrines), at a price
+    const run = this.game.run;
+    if (this.game.heroes.length === 1 && run && run.secondChance > 0) { this.secondChance(); return; }
     this.hp = 0; this.downed = true; this.state = 'downed'; this.interrupt();
     this.stats.downs++;
     this.deathSaves = { s: 0, f: 0, t: 2.4 };
     this.model.once('Death_A', { duration: 0.9, hold: true });
     this.game.fx.text('DOWNED', this.pos.x, 3.4, this.pos.z, { color: '#ff4a4a', big: true });
-    this.game.log(`${this.label} falls! Death saves begin.`, '#ff4a4a');
+    this.game.log(t('{0} falls! Death saves begin.', this.label), '#ff4a4a');
     audio.play('downed', { vol: 0.7 });
     this.game.hitstop(0.12);
   }
+  secondChance() {
+    const g = this.game, run = g.run;
+    run.secondChance--;
+    const lost = Math.floor(run.ash * 0.25);
+    run.ash -= lost;
+    const potionLost = this.potions > 0;
+    if (potionLost) this.potions--;
+    this.hp = Math.ceil(this.maxHp * 0.5);
+    this.iframes = 2.2; this.state = 'free'; this.interrupt();
+    this.model.stopOneShot(); this.model.once('Spawn_Ground', { duration: 0.8 });
+    g.hitstop(0.35); g.flash(0.35, '#ffb060'); g.shake(0.6);
+    g.fx.burst('flame_05', this.pos.x, 1, this.pos.z, 30, { color: 0xffb060, speed: 8, up: 5, size: 1.4 });
+    g.fx.light({ x: this.pos.x, z: this.pos.z, color: 0xffb060, intensity: 20, life: 0.6, distance: 18 });
+    for (const e of g.enemies) if (e.alive && e.distTo(this) < 6) { const a = this.dirTo(e); e.knock.x += Math.cos(a) * 16; e.knock.z += Math.sin(a) * 16; e.addCond('prone', 1); }
+    g.ui.banner('Second Chance', potionLost ? t('You rise again — lost {0} Ash and a potion.', lost) : t('You rise again — lost {0} Ash.', lost), 2.6);
+    g.log(t('{0} refuses to fall (-{1} Ash).', this.label, lost), '#ffb060');
+    audio.play('levelUp', { vol: 0.8 });
+    g.ui.refreshHud();
+  }
+
   die() {
     this.downed = false; this.dead = true; this.state = 'dead';
     this.model.setOpacity(0.35);
     this.game.fx.text('SLAIN', this.pos.x, 3.4, this.pos.z, { color: '#ff2a2a', big: true });
     this.game.fx.burst('smoke_07', this.pos.x, 1, this.pos.z, 12, { color: 0x553344, speed: 2, up: 2, additive: false });
-    this.game.log(`${this.label} has died. They return when the room is cleared.`, '#ff2a2a');
+    this.game.log(t('{0} has died. They return when the room is cleared.', this.label), '#ff2a2a');
   }
 
   // ---------------- targeting helpers -----------------
@@ -340,14 +365,23 @@ export class Hero extends Actor {
       case 'stagger': { moveMul = 0.1; if (this.stateT <= 0) this.state = 'free'; break; }
       case 'revive': {
         moveMul = 0;
-        const t = this.reviveTarget;
-        if (!c || !c.held.interact || !t || !t.downed || this.distTo(t) > 3) { this.state = 'free'; this.reviveTarget = null; break; }
+        const tgt = this.reviveTarget;
+        if (!c || !c.held.interact || !tgt || !(tgt.downed || tgt.dead) || this.distTo(tgt) > 3) { this.state = 'free'; this.reviveTarget = null; break; }
         this.reviveProgress += dt * (this.flags.has('durable') ? 1.4 : 1);
-        if (this.reviveProgress >= 1.3) {
+        if (tgt.dead && this.reviveProgress >= RAISE_TIME) {
+          // co-op: raise a slain ally mid-fight by burning part of the party's Ash
+          const cost = g.raiseCost();
+          g.run.ash = Math.max(0, g.run.ash - cost);
+          tgt.revive(Math.ceil(tgt.maxHp * 0.3));
+          g.fx.burst('flame_05', tgt.pos.x, 1, tgt.pos.z, 24, { color: 0xffb060, speed: 4, up: 6 });
+          g.log(t('{0} raises {1} from the ashes (-{2} Ash).', this.label, tgt.label, cost), '#ffb060');
+          this.stats.revives++;
+          this.state = 'free'; this.reviveTarget = null;
+        } else if (tgt.downed && this.reviveProgress >= 1.3) {
           const r = d20(); const medicine = r.roll + this.mods.wis + (this.cls.id === 'druid' ? this.prof : 0);
           g.fx.die({ x: this.pos.x, y: 3.4, z: this.pos.z, value: r.roll, color: this.diceColor, good: medicine >= 10 });
-          g.log(`${this.label} Medicine check: d20 ${r.roll} + ${medicine - r.roll} = ${medicine} vs DC 10`, this.color);
-          t.revive(medicine >= 10 ? Math.max(1, Math.floor(t.maxHp * (medicine >= 20 ? 0.5 : 0.25))) : 1);
+          g.log(`${this.label} ${t('Medicine check')}: d20 ${r.roll} + ${medicine - r.roll} = ${medicine} ${t('vs DC {0}', 10)}`, this.color);
+          tgt.revive(medicine >= 10 ? Math.max(1, Math.floor(tgt.maxHp * (medicine >= 20 ? 0.5 : 0.25))) : 1);
           this.stats.revives++;
           this.state = 'free'; this.reviveTarget = null;
         }
@@ -357,8 +391,8 @@ export class Hero extends Actor {
 
     // interact (revive / world interactions)
     if (c && !g.inputLocked && this.state === 'free' && c.pressed('interact')) {
-      const t = g.heroes.find((h) => h !== this && h.downed && h.distTo(this) < 3);
-      if (t) { this.state = 'revive'; this.reviveTarget = t; this.reviveProgress = 0; this.model.loop('Interact'); }
+      const tgt = g.heroes.find((h) => h !== this && h.downed && h.distTo(this) < 3) || g.heroes.find((h) => h !== this && h.dead && h.distTo(this) < 3);
+      if (tgt) { this.state = 'revive'; this.reviveTarget = tgt; this.reviveProgress = 0; this.model.loop('Interact'); }
       else g.interact(this);
     }
 
@@ -404,9 +438,9 @@ export class Hero extends Actor {
       const r = d20(this.flags.has('periapt') ? 1 : 0);
       const v = r.roll;
       g.fx.die({ x: this.pos.x, y: 3, z: this.pos.z, value: v, color: this.diceColor, good: v >= 10 });
-      if (v === 20) { g.log(`${this.label} rolls a natural 20 on a death save and rises!`, '#ffd23f'); this.revive(1); return; }
+      if (v === 20) { g.log(t('{0} rolls a natural 20 on a death save and rises!', this.label), '#ffd23f'); this.revive(1); return; }
       if (v === 1) this.deathSaves.f += 2; else if (v >= 10) this.deathSaves.s++; else this.deathSaves.f++;
-      g.log(`${this.label} death save: ${v} (${this.deathSaves.s}✓ ${this.deathSaves.f}✗)`, v >= 10 ? '#cfc7b4' : '#ff4a4a');
+      g.log(`${this.label} ${t('death save')}: ${v} (${this.deathSaves.s}✓ ${this.deathSaves.f}✗)`, v >= 10 ? '#cfc7b4' : '#ff4a4a');
       if (this.deathSaves.f >= 3) this.die();
       else if (this.deathSaves.s >= 3) { g.fx.text('STABLE', this.pos.x, 3, this.pos.z, { color: '#cfc7b4' }); }
     }
