@@ -43,6 +43,30 @@ vocals, lyrics, rap, EDM drop, dubstep, trap hi-hats, modern pop, autotune, brig
 
 ---
 
+## Keeping the drums in the background
+
+Suno leans hard into rhythm. Any mention of war drums, taiko, pulse, "driving"
+or "relentless" tends to produce a beat-led track with a dominant low end.
+The first Crypt prompt did exactly that: over half of the track's energy sat
+below 150 Hz, with a locked kick at about 120 BPM. What helps:
+
+- **Lead with the instruments that should be in front**: "melody-led",
+  "organ-led", "psaltery melody in the foreground".
+- **Describe percussion as rare and far away**: "very sparse distant soft hand
+  drum low in the mix", "no drum kit". Never say "drums on beats 1 and 3".
+- **Keep the tempo slow**: 65–80 BPM for exploration beds.
+- **Put rhythm words in Exclude**: steady drum beat, driving percussion, taiko,
+  war drums, four-on-the-floor, loud kick, booming low end, trailer percussion.
+- **Keep the structure tags free of beat sections**: use Theme, Development,
+  Tension and Reprise rather than Chorus or Drop.
+- If a take still comes out beat-heavy, use **Extend** from a quiet moment, or
+  regenerate with the same prompt. Takes vary a lot.
+
+Boss tracks can keep more percussion. Even there, ask for "timpani and drums
+supporting the orchestra" rather than drums leading.
+
+---
+
 ## 1. Title screen
 **Context:** the main menu over the shrine and the four idle heroes. Plays for minutes, must not tire.
 **File:** `assets/audio/music/na_intro.mp3` (`title`)
@@ -88,73 +112,71 @@ shared list + jolly tavern jig, fiddle hoedown, accordion, celebration
 ```
 
 ## 3. Depth I: The Sunken Crypt (exploration and combat)
-**Context:** skeletons, ghosts, wet stone. This is where most play time is spent, so it needs a driving pulse without fatigue.
+**Context:** skeletons, ghosts, wet stone. Most of a run is spent here, under constant sword, spell and dice sounds, so the music is a tense **bed**, not a battle anthem. The melody and drones lead; percussion is rare and far away.
 **File:** `assets/audio/music/na_crypt.mp3` (`crypt`)
 
 **Style**
 ```
-dark souls-like dungeon combat, 108 bpm, D minor, pulsing low strings ostinato, war drums and taiko on beats 1 and 3, dissonant church organ stabs, eerie choir "ah", dripping water and chain foley, PS1-era horror game soundtrack, gritty lo-fi sampler, tense, relentless, seamless loop
+dark ambient dungeon exploration, slow 72 bpm, D minor, melody-led, sustained low strings and viola da gamba drone, lonely bowed psaltery melody in the foreground, soft church organ chords, distant wordless choir, water drips and faint chains, very sparse distant soft hand drum low in the mix, no drum kit, PS1-era horror game soundtrack, lo-fi sampler, cold, uneasy, spacious, seamless loop
 ```
 **Exclude**
 ```
-shared list + heroic fanfare, major key resolution, electric guitar, metal
+shared list + steady drum beat, driving percussion, war drums, taiko, four-on-the-floor, loud kick, booming low end, trailer percussion, battle music, heroic fanfare, electric guitar
 ```
 **Structure**
 ```
 [Instrumental]
-[Intro: low string ostinato, water drips]
-[Verse: drums enter, organ stabs on offbeats]
-[Pre-Chorus: rising string tremolo]
-[Chorus: choir sings Oath motif over full drums]
-[Breakdown: drums drop, ostinato only]
-[Chorus]
-[Outro: ostinato, loop point]
+[Intro: low drone, water drips]
+[Theme: psaltery plays the Oath motif slowly over the drone]
+[Development: gamba countermelody, soft organ chords, one distant drum hit]
+[Tension: string tremolo swells, no percussion]
+[Theme reprise: choir hums the motif, drone deepens]
+[Outro: drone and drips only, loops into intro]
 ```
 
 ## 4. Depth II: The Fungal Ossuary
-**Context:** orcs, myconids, oozes, sepia bone halls. Organic, rotten, a little alien.
+**Context:** orcs, myconids, oozes, sepia bone halls. Organic, rotten, a little alien. Texture over rhythm.
 **File:** `assets/audio/music/na_dark_castle.mp3` (`ossuary`)
 
 **Style**
 ```
-dark fantasy tribal dungeon, 100 bpm, E Phrygian, bone xylophone and wooden marimba ostinato, deep frame drums and stomps, droning didgeridoo-like low drone, detuned hurdy-gurdy melody, wet squelchy foley, throat-singing hums, PS1-era sampler grit, claustrophobic, fungal, menacing, loopable
+dark ambient fungal cavern, slow 68 bpm, E Phrygian, texture-led, soft wooden marimba and bone chime motif in the foreground, droning low hurdy-gurdy, breathy throat-singing pad, wet organic foley and dripping, occasional muffled distant hand drum low in the mix, no drum kit, PS1-era sampler grit, claustrophobic, eerie, slowly breathing, seamless loop
 ```
 **Exclude**
 ```
-shared list + clean orchestral strings, church organ, heroic choir, tropical, world-music cheerfulness
+shared list + steady drum beat, tribal drum circle, stomping rhythm, driving percussion, taiko, loud kick, booming low end, world-music groove, tropical
 ```
 **Structure**
 ```
 [Instrumental]
-[Intro: bone xylophone ostinato]
-[Verse: stomps and drums, drone enters]
-[Chorus: hurdy-gurdy plays Oath motif in Phrygian]
-[Bridge: everything drops to drone and squelches]
-[Chorus]
-[Outro: xylophone alone, loop point]
+[Intro: drips and a low drone]
+[Theme: marimba states the Oath motif in Phrygian, slowly]
+[Development: hurdy-gurdy joins, throat-singing pad swells]
+[Bridge: everything thins to drone and squelches]
+[Theme reprise: bone chimes answer the marimba]
+[Outro: drone only, loop point]
 ```
 
 ## 5. Depth III: The Ember Abyss
-**Context:** demons, will-o-wisps and drakes near the final boss. Hot, grand, desperate.
+**Context:** demons, will-o-wisps and drakes before the final boss. Hot and grand, but still a bed under the fighting: the grandeur comes from organ and choir, not drums.
 **File:** `assets/audio/music/na_final_area.mp3` (`abyss`)
 
 **Style**
 ```
-infernal dark fantasy, 116 bpm, C minor, full church organ and low brass ostinato, massive taiko and anvil hits, demonic low choir chanting in a made-up language, crackling fire and ember foley, distorted cello riffs, PS1-era epic dungeon soundtrack, lo-fi sampler crunch, urgent and grand, seamless loop
+dark ambient infernal cathedral, slow 76 bpm, C minor, organ-led, deep church organ pedal and slow chord progression, mournful cello melody in the foreground, distant low choir chanting softly, crackling fire and ember foley, rare far-off timpani swell low in the mix, no drum kit, PS1-era epic dungeon soundtrack, lo-fi sampler warmth, ominous, vast, simmering, seamless loop
 ```
 **Exclude**
 ```
-shared list + cartoonish villain, electric guitar shred, synthwave, cinematic trailer braams
+shared list + steady drum beat, driving percussion, taiko, war drums, anvil hits, loud kick, booming low end, trailer braams, battle music, electric guitar
 ```
 **Structure**
 ```
 [Instrumental]
-[Intro: organ pedal tone and fire crackle]
-[Verse: cello riff, taiko pulse]
-[Chorus: choir chants Oath motif, brass answers]
-[Interlude: anvil hits solo]
-[Chorus]
-[Outro: organ pedal, loop point]
+[Intro: organ pedal tone, fire crackle]
+[Theme: cello plays the Oath motif over slow organ chords]
+[Development: choir enters softly, one distant timpani swell]
+[Climax: full organ chord, choir rises, still no beat]
+[Outro: organ pedal and fire, loop point]
 ```
 
 ## 6. Boss: Morvayne, the Hollow Bishop (Depth I)
