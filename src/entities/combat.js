@@ -3,6 +3,7 @@
 import { attackRoll, savingThrow, rollDice, netAdvantage, rng, frand } from '../core/rules.js';
 import { audio } from '../core/audio.js';
 import { PACTS } from '../data/boons.js';
+import { t } from '../i18n/index.js';
 
 const TYPE_COLOR = { fire: '#ff8a3a', cold: '#8fd3ff', radiant: '#ffe48a', necrotic: '#b07cff', lightning: '#7ff0ff', thunder: '#d0e0ff', poison: '#9be36a', acid: '#c8f06a', force: '#c8a0ff', psychic: '#ff9ad8' };
 
@@ -84,9 +85,9 @@ export function heroAttack(game, hero, target, opts = {}) {
   const res = attackRoll({ bonus, ac, adv, critRange, luckyReroll: () => hero.useLuck() });
   if (hero.cls.id === 'rogue' && hero.level >= 9 && !res.hit && res.roll < 6 && 6 + bonus >= ac) { res.hit = true; res.total = 6 + bonus; }
   if (!opts.noDie) game.fx.die({ x: hero.pos.x, y: 3.4, z: hero.pos.z, value: res.roll, color: hero.diceColor, good: res.hit });
-  const advTxt = adv > 0 ? ' (adv)' : adv < 0 ? ' (dis)' : '';
+  const advTxt = adv > 0 ? ` (${t('adv')})` : adv < 0 ? ` (${t('dis')})` : '';
   if (!res.hit) {
-    game.log(`${hero.label}: d20 ${res.rolls.join('/')}${advTxt} +${bonus} = ${res.total} vs AC ${ac} — ${res.fumble ? 'FUMBLE' : 'miss'}`, hero.color);
+    game.log(`${hero.label}: d20 ${res.rolls.join('/')}${advTxt} +${bonus} = ${res.total} ${t('vs AC {0}', ac)} — ${res.fumble ? t('FUMBLE') : t('miss')}`, hero.color);
     game.fx.text(res.fumble ? 'FUMBLE' : 'MISS', target.pos.x, (target.height || 2) + 0.6, target.pos.z, { color: '#9aa0a8' });
     audio.play('miss', { vol: 0.5 });
     if (res.fumble) hero.addCond('fumbled', 0.5);
@@ -134,7 +135,7 @@ export function heroAttack(game, hero, target, opts = {}) {
   if (res.roll === 20 && hero.flags.has('vorpal') && !target.isBoss) parts.push({ amount: 9999, type: 'slashing' });
   const before = target.hp;
   const total = applyDamage(game, hero, target, parts, { crit: res.crit, poise: heavy ? (spec.poise || 2) * (hero.flags.has('ogre') ? 1.5 : 1) : 1, knock: heavy ? 7 : 2.5, angle: hero.dirTo(target), heavy });
-  game.log(`${hero.label}: d20 ${res.rolls.join('/')}${advTxt} +${bonus} = ${res.total} vs AC ${ac} — ${res.crit ? 'CRIT' : 'hit'} for ${total}`, hero.color);
+  game.log(`${hero.label}: d20 ${res.rolls.join('/')}${advTxt} +${bonus} = ${res.total} ${t('vs AC {0}', ac)} — ${res.crit ? t('CRIT') : t('hit')} ${t('for {0}', total)}`, hero.color);
   hero.afterHit(target, res, total, before);
   if (res.crit) { game.hitstop(0.09); game.shake(0.35); audio.play('crit', { vol: 0.6 }); game.fx.text('CRITICAL', target.pos.x, (target.height || 2) + 1.6, target.pos.z, { color: '#ffd23f', big: true }); }
   return { ...res, damage: total };
@@ -182,7 +183,7 @@ export function enemyAttack(game, enemy, hero, { dice = enemy.def.dmg, type = en
   game.fx.die({ x: enemy.pos.x, y: (enemy.height || 2.4) + 0.8, z: enemy.pos.z, value: res.roll, color: 'red', good: !res.hit });
   if (!res.hit) {
     game.fx.text('BLOCKED', hero.pos.x, 3, hero.pos.z, { color: '#c8c2b0', size: 0.9 });
-    game.log(`${enemy.name}: d20 ${res.roll}+${bonus} = ${res.total} vs your AC ${hero.ac} — miss`, '#9aa0a8');
+    game.log(`${enemy.name}: d20 ${res.roll}+${bonus} = ${res.total} ${t('vs AC {0}', hero.ac)} — ${t('miss')}`, '#9aa0a8');
     audio.play('hitArmor', { vol: 0.5 });
     hero.model && hero.model.hitFlash(0x8fb0ff);
     return res;
@@ -191,7 +192,7 @@ export function enemyAttack(game, enemy, hero, { dice = enemy.def.dmg, type = en
   if (game.vows.has('teeth')) amt = Math.ceil(amt * 1.3);
   if (enemy.has('warcry')) amt += 2;
   const total = applyDamage(game, enemy, hero, [{ amount: amt, type }], { crit: res.crit, knock: 6, angle: enemy.dirTo(hero) });
-  game.log(`${enemy.name}: d20 ${res.roll}+${bonus} = ${res.total} vs AC ${hero.ac} — ${res.crit ? 'CRIT' : 'hit'} ${total} ${type}`, '#ff6a5a');
+  game.log(`${enemy.name}: d20 ${res.roll}+${bonus} = ${res.total} ${t('vs AC {0}', hero.ac)} — ${res.crit ? t('CRIT') : t('hit')} ${total} ${t(type)}`, '#ff6a5a');
   if (total > 0) {
     if (enemy.affixes && enemy.affixes.includes('vampiric')) enemy.heal(Math.ceil(total / 2));
     if (enemy.def.drain) enemy.heal(Math.ceil(total / 2));
@@ -211,7 +212,7 @@ export function heroSave(game, hero, { ability = 'dex', dc = 12, dice, type, hal
   if (!res.success && hero.cls.id === 'fighter' && hero.level >= 9 && hero.indomitable > 0) { hero.indomitable--; res = savingThrow({ bonus: hero.saves[ability], dc }); game.fx.text('INDOMITABLE', hero.pos.x, 3.6, hero.pos.z, { color: '#d8b46a' }); }
   if (!res.success && ability === 'dex' && hero.flags.has('evasion_ring')) res.success = true;
   game.fx.die({ x: hero.pos.x, y: 3.4, z: hero.pos.z, value: res.roll, color: hero.diceColor, good: res.success });
-  game.log(`${hero.label} ${ability.toUpperCase()} save ${label}: d20 ${res.rolls.join('/')} +${hero.saves[ability]} = ${res.total} vs DC ${dc} — ${res.success ? 'success' : 'fail'}`, hero.color);
+  game.log(`${hero.label} ${t(ability.toUpperCase())} ${t('save')} ${t(label)}: d20 ${res.rolls.join('/')} +${hero.saves[ability]} = ${res.total} ${t('vs DC {0}', dc)} — ${res.success ? t('success') : t('fail')}`, hero.color);
   if (dice) {
     let amt = rollDice(dice);
     if (game.vows.has('teeth')) amt = Math.ceil(amt * 1.3);

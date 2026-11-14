@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { loadTexture, loadGLTF } from '../core/assets.js';
 import { psxify, retroify } from './psx.js';
 import { frand } from '../core/rules.js';
+import { t, canvasFont } from '../i18n/index.js';
 
 const FX_TEX = ['slash_02', 'slash_03', 'magic_02', 'magic_04', 'magic_05', 'fire_01', 'flame_03', 'flame_05', 'spark_04', 'spark_06', 'smoke_03', 'smoke_07',
   'star_05', 'star_07', 'circle_03', 'circle_05', 'light_02', 'twirl_02', 'scorch_02', 'symbol_01', 'symbol_02', 'trace_04', 'flare_01', 'dirt_02', 'scratch_01'];
@@ -148,7 +149,7 @@ export class FX {
 
   // ---- floating text (drawn on the overlay canvas each frame)
   text(str, x, y, z, { color = '#fff', size = 1, life = 1.0, vy = 1.6, big = false, drift = 0 } = {}) {
-    this.texts.push({ str: String(str), x, y, z, color, size, life, max: life, vy, big, drift: drift || frand(-0.4, 0.4) });
+    this.texts.push({ str: t(String(str)), x, y, z, color, size, life, max: life, vy, big, drift: drift || frand(-0.4, 0.4) });
   }
 
   // ---- 3D d20 that tumbles and lands showing the roll
@@ -233,7 +234,7 @@ export class FX {
       const k = t.life / t.max;
       const pop = t.max - t.life < 0.08 ? 1.4 : 1;
       const px = Math.round((t.big ? 22 : 14) * t.size * pop);
-      ctx.font = `${px}px VT323, monospace`;
+      ctx.font = canvasFont(px);
       ctx.globalAlpha = Math.min(1, k * 3);
       ctx.fillStyle = '#000';
       ctx.fillText(t.str, sx + 1, sy + 1); ctx.fillText(t.str, sx - 1, sy + 1);

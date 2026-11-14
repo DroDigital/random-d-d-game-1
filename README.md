@@ -18,15 +18,49 @@ ordered dithering. Every part of the filter can be toggled in Options.
 
 > The other two game concepts I designed (a time-loop deckbuilder and a
 > dungeon-building colony sim) are in [`docs/GAME_IDEAS.md`](docs/GAME_IDEAS.md).
+> Suno prompts for a replacement soundtrack are in [`docs/SUNO_PROMPTS.md`](docs/SUNO_PROMPTS.md).
 
-## Play it (Windows, macOS, Linux; no engine, no install)
+## Play it (Windows, macOS, Linux; no engine)
+
+**Desktop app.** Native builds are produced by the *Desktop builds* GitHub
+Action (Actions tab → Desktop builds → Run workflow, or push a `v*` tag to
+attach them to a Release):
+
+| OS | Package |
+|---|---|
+| Windows | `AshenOath-Setup-x.y.z.exe` (installer) or `AshenOath-Portable-x.y.z.exe` |
+| macOS | `AshenOath-x.y.z-mac.dmg` (universal: Intel + Apple Silicon) |
+| Linux | `AshenOath-x.y.z-x86_64.AppImage` or `.tar.gz` |
+
+The builds are unsigned. On macOS, right-click the app → Open the first time.
+On Windows, choose "More info → Run anyway" in SmartScreen. In the desktop
+app, F11 or Alt+Enter toggles fullscreen.
+
+To build them yourself:
+
+```bash
+npm install
+```
+
+```bash
+npm run dist:linux
+```
+
+Use `dist:win` or `dist:mac` for the other platforms. A `.dmg` can only be built
+on macOS, and the Windows installer needs Windows or Wine; zips build anywhere.
+
+**Browser, straight from disk:**
 
 1. Download or clone this repository.
 2. Open **`play/index.html`** in a modern browser (Chrome, Edge, Firefox or
    Safari 16+). Double-clicking it is enough: it runs straight from disk,
    offline, with no server.
 
-Plug in gamepads before or during the character select screen. Everything is
+Plug in gamepads before or during the character select screen.
+
+**Languages:** English, Deutsch, Español, Français, 简体中文, 日本語. The
+language is detected from your system and can be changed under Options →
+Language. Everything is
 also playable with two people on one keyboard.
 
 ### Controls
@@ -57,8 +91,11 @@ Players join on the **Gathering** screen by pressing *Attack* on their device.
   and so on.
 - **Souls-like:** stamina, dodge i-frames, poise breaks, red telegraphs. At
   0 HP you are *downed* and roll death saves while allies hold Interact to
-  revive you. A party wipe spends an **Ember** and returns you to the last
-  **Ember Shrine**, but your **Ash** stays where you fell until you reclaim it.
+  revive you. Slain allies can be raised mid-fight by holding Interact
+  over them for a share of the party's Ash. A party wipe spends an **Ember**
+  and returns you to the last **Ember Shrine**, but your **Ash** stays where
+  you fell until you reclaim it. Playing solo, you get one **Second Chance**
+  per shrine: you rise at half HP, losing 25% of your Ash and a potion.
 - **Roguelite:** choose between doors marked Battle, Elite, Vault, Ash Cache,
   Peddler, Dicer's Altar, Trial or Shrine. Draft boons (feats, magic items,
   spell-pacts) after fights. Three boons of one pact give an *Attunement*;
@@ -88,7 +125,9 @@ smoke test (it needs Playwright installed).
   (`src/render/psx.js`)
 - **rot.js** for seeded RNG and cellular-automata room generation
 - **howler.js** for audio
-- **Fontsource** fonts (IM Fell English, VT323)
+- **Fontsource** fonts (IM Fell English, VT323), plus subsets of Noto Serif SC/JP
+  for Chinese and Japanese (`tools/subset-cjk.sh`)
+- **Electron** + **electron-builder** for the desktop builds (`desktop/main.js`)
 - **esbuild** bundles everything. `tools/build.mjs` packs every asset into
   `play/data/pack-*.js` as data URIs, so the game runs from `file://` with
   no server.

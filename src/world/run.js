@@ -14,6 +14,7 @@ export class Run {
     this.ash = metaData.has('ash_tithe') ? 300 : 0;
     this.checkpoint = { depthIndex: 0, roomIndex: 0 };
     this.remains = null;
+    this.secondChance = 1; // solo only: rise once per shrine
     this.roomsCleared = 0; this.bossesSlain = 0; this.elitesSlain = 0;
     this.partySize = partySize;
     this.startTime = Date.now();

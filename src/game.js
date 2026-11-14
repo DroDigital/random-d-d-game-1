@@ -6,7 +6,7 @@ import { ModelLib } from './render/models.js';
 import { Kit } from './world/kit.js';
 import { generateRoom, buildRoom, CELL, SIDE } from './world/room.js';
 import { Run, draftBoons } from './world/run.js';
-import { Hero } from './entities/hero.js';
+import { Hero, RAISE_TIME } from './entities/hero.js';
 import { Enemy } from './entities/enemy.js';
 import { Boss } from './entities/boss.js';
 import { Projectile, Zone } from './entities/projectile.js';
@@ -20,6 +20,8 @@ import { input } from './core/input.js';
 import { meta } from './core/meta.js';
 import { loadGLTF, url } from './core/assets.js';
 import { retroify } from './render/psx.js';
+import { t, canvasFont } from './i18n/index.js';
+import { PACTS } from './data/boons.js';
 
 export class Game {
   constructor() {
@@ -218,7 +220,7 @@ export class Game {
     this.camTarget.set(ent.x, 0, ent.z - 4);
     // content
     const roomDef = ROOM_TYPES[type];
-    this.ui.roomTitle(roomDef ? roomDef.name : type, `${depth.sub} · Room ${run.roomIndex}/${ROOMS_PER_DEPTH}`);
+    this.ui.roomTitle(roomDef ? roomDef.name : type, `${t(depth.sub)} · ${t('Room {0}', `${run.roomIndex}/${ROOMS_PER_DEPTH}`)}`);
     if (type === 'shrine') { this.addShrine(0, 0); this.interactables.push({ x: 0, z: 0, r: 4.4, label: 'Rest at the Ember Shrine', kind: 'shrine' }); this.setCleared(true); audio.music('shrine'); }
     else if (type === 'peddler') this.setupPeddler();
     else if (type === 'altar') this.setupAltar();
@@ -282,7 +284,7 @@ export class Game {
     if (id === 'mimic') { e.state = 'disguised'; e.hidden = true; }
     this.enemies.push(e);
     e.spawnModel(this.models).then(() => { e.ready = true; if (opts.thrall) { e.thrall = true; } });
-    if (opts.elite) this.log(`An elite ${def.name} (${opts.affixes.map((a) => AFFIXES[a].name).join(', ')}) appears!`, '#ffb347');
+    if (opts.elite) this.log(t('An elite {0} ({1}) appears!', t(def.name), opts.affixes.map((a) => t(AFFIXES[a].name)).join(', ')), '#ffb347');
     return e;
   }
 
@@ -368,7 +370,7 @@ export class Game {
     this.scene.add(obj);
     this.fx.decal('dngn_floor_cobble_blood3', { x: ent.x + 2, z: ent.z, size: 3, color: 0xffffff, opacity: 0.8, life: 1e9, additive: false });
     const light = this.fx.persistentLight({ x: ent.x + 2, y: 1.5, z: ent.z, color: 0xff8a3a, intensity: 6, distance: 6, flicker: 0.6 });
-    this.interactables.push({ x: ent.x + 2, z: ent.z, r: 2.4, label: `Reclaim your Ashen Remains (${r.ash})`, kind: 'remains', obj, light, auto: true });
+    this.interactables.push({ x: ent.x + 2, z: ent.z, r: 2.4, label: t('Reclaim your Ashen Remains ({0})', r.ash), kind: 'remains', obj, light, auto: true });
   }
 
   buildDoors() {
@@ -452,11 +454,13 @@ export class Game {
     if (!quiet) {
       audio.play('boon', { vol: 0.7 });
       this.fx.burst('star_05', hero.pos.x, 1.5, hero.pos.z, 16, { color: 0xffe48a, speed: 3, up: 4 });
-      this.log(`${hero.label} gains ${boon.name}.`, hero.color);
-      for (const p of hero.bonds || []) if (!hero.announcedBonds?.has(p)) { (hero.announcedBonds = hero.announcedBonds || new Set()).add(p); this.ui.banner('Pact Bond', `${p.toUpperCase()} — shared by the party`, 2); }
+      this.log(t('{0} gains {1}.', hero.label, t(boon.name)), hero.color);
+      for (const p of hero.bonds || []) if (!hero.announcedBonds?.has(p)) { (hero.announcedBonds = hero.announcedBonds || new Set()).add(p); this.ui.banner('Pact Bond', t('{0} — shared by the party', t(PACTS[p].name)), 2); }
     }
     this.ui.refreshHud();
   }
+
+  raiseCost() { return Math.max(50, Math.round(this.run.ash * 0.15)); }
 
   // ---------------------------------------------------------------- spawn helpers
   spawnProjectile(o) { const p = new Projectile(this, o); this.projectiles.push(p); return p; }
@@ -496,7 +500,7 @@ export class Game {
     this.run.bossesSlain++;
     audio.play('bossDown', { vol: 0.9 });
     this.hitstop(0.5); this.shake(1); this.flash(0.4, '#ffe0a0');
-    this.ui.banner('Victory', `${b.def.name} has fallen`, 3);
+    this.ui.banner('Victory', t('{0} has fallen', t(b.def.name)), 3);
     for (const e of this.enemies) if (e.alive && !e.isBoss) e.die(null);
     this.bossPos = { x: b.pos.x, z: b.pos.z };
     this.boss = null;
@@ -515,6 +519,7 @@ export class Game {
           this.shrineRested = true;
           for (const h of this.heroes) h.fullRest(!this.vows.has('scarcity'));
           this.run.checkpoint = { depthIndex: this.run.depthIndex, roomIndex: this.run.roomIndex };
+          this.run.secondChance = 1;
           audio.play('shrine', { vol: 0.9 });
           this.ui.banner('Ember Shrine', 'The party rests. Checkpoint kindled.', 2.2);
           this.fx.burst('flame_05', 0, 1, 0, 30, { color: 0xffb060, speed: 4, up: 5 });
@@ -555,8 +560,8 @@ export class Game {
     audio.play('levelUp', { vol: 0.8 });
     this.fx.burst('star_05', hero.pos.x, 1.5, hero.pos.z, 24, { color: 0xffe48a, speed: 4, up: 6 });
     const feat = hero.cls.features[hero.level];
-    this.log(`${hero.label} reaches level ${hero.level}!${feat ? ' ' + feat : ''}`, '#ffe48a');
-    if (feat) this.ui.banner(`${hero.label} — Level ${hero.level}`, feat, 2.6);
+    this.log(t('{0} reaches level {1}!', hero.label, hero.level) + (feat ? ' ' + t(feat) : ''), '#ffe48a');
+    if (feat) this.ui.banner(`${hero.label} — ${t('Level {0}', hero.level)}`, t(feat), 2.6);
     if (hero.level === 4 || hero.level === 8) this.ui.openDraft(hero, draftBoons(hero, { depth: this.run.depthIndex, minRarity: 'uncommon' }));
     return true;
   }
@@ -592,7 +597,7 @@ export class Game {
       // drop remains
       run.remains = run.ash > 0 ? { depthIndex: run.depthIndex, roomIndex: run.roomIndex, ash: run.ash } : null;
       run.ash = 0;
-      this.ui.banner('The Ember Fades', `${run.embers} ${run.embers === 1 ? 'Ember remains' : 'Embers remain'}. Your Ash lies where you fell.`, 3.2);
+      this.ui.banner('The Ember Fades', t(run.embers === 1 ? '{0} Ember remains. Your Ash lies where you fell.' : '{0} Embers remain. Your Ash lies where you fell.', run.embers), 3.2);
       await new Promise((r) => setTimeout(r, 1200));
       run.depthIndex = run.checkpoint.depthIndex; run.roomIndex = run.checkpoint.roomIndex; run.roomType = 'shrine';
       for (const h of this.heroes) h.fullRest(true);
@@ -772,13 +777,15 @@ export class Game {
       if (!h.canAct || h.menuLock) continue;
       const it = this.interactables.find((i) => Math.hypot(i.x - h.pos.x, i.z - h.pos.z) < i.r);
       if (it && it.auto && it.kind === 'remains') {
-        this.run.ash += this.run.remains.ash; this.fx.text(`+${this.run.remains.ash} ASH`, it.x, 2.5, it.z, { color: '#ff9a40', big: true });
+        this.run.ash += this.run.remains.ash; this.fx.text(`+${this.run.remains.ash} ${t('ASH')}`, it.x, 2.5, it.z, { color: '#ff9a40', big: true });
         audio.play('coins', { vol: 0.7 }); this.run.remains = null; this.scene.remove(it.obj); this.fx.freeLight(it.light);
         this.interactables = this.interactables.filter((x) => x !== it); continue;
       }
       if (it) prompts.push({ hero: h, text: it.label });
       const down = this.heroes.find((o) => o !== h && o.downed && o.distTo(h) < 3);
-      if (down) prompts.push({ hero: h, text: `Hold to revive ${down.label}` });
+      const slain = !down && this.heroes.find((o) => o !== h && o.dead && o.distTo(h) < 3);
+      if (down) prompts.push({ hero: h, text: t('Hold to revive {0}', down.label) });
+      else if (slain) prompts.push({ hero: h, text: t('Hold to raise {0} ({1} Ash)', slain.label, this.raiseCost()) });
     }
     for (const d of this.doors) if (!d.open && this.cleared && this.chestPending) { /* chest first */ }
     this.ui.prompts(prompts);
@@ -835,15 +842,24 @@ export class Game {
       ctx.fillStyle = e.thrall ? '#8a5cff' : '#c0302a'; ctx.fillRect(x - w / 2, y, Math.round(w * e.hp / e.maxHp), 4);
       if (e.ward > 0) { ctx.fillStyle = '#7fc8ff'; ctx.fillRect(x - w / 2, y - 3, Math.round(w * Math.min(1, e.ward / (e.maxHp * 0.3))), 2); }
       if (e.poise > 0) { ctx.fillStyle = '#ffb347'; ctx.fillRect(x - w / 2, y + 5, Math.round(w * Math.min(1, e.poise / e.poiseMax)), 2); }
-      if (e.elite) { ctx.font = '14px VT323'; ctx.textAlign = 'center'; ctx.fillStyle = AFFIXES[e.affixes[0]]?.color || '#ffb347'; ctx.fillText(e.affixes.map((a) => AFFIXES[a].name).join(' · '), x, y - 8); }
-      if (e.marked) { ctx.fillStyle = '#9db35c'; ctx.font = '16px VT323'; ctx.textAlign = 'center'; ctx.fillText('◎', x + w / 2 + 8, y + 3); }
+      if (e.elite) { ctx.font = canvasFont(14); ctx.textAlign = 'center'; ctx.fillStyle = AFFIXES[e.affixes[0]]?.color || '#ffb347'; ctx.fillText(e.affixes.map((a) => AFFIXES[a].name).join(' · '), x, y - 8); }
+      if (e.marked) { ctx.fillStyle = '#9db35c'; ctx.font = canvasFont(16); ctx.textAlign = 'center'; ctx.fillText('◎', x + w / 2 + 8, y + 3); }
+    }
+    // slain heroes in co-op: a raise prompt + progress over their ghost
+    for (const h of this.heroes) {
+      if (!h.dead || this.heroes.length < 2) continue;
+      v.set(h.pos.x, 2.4, h.pos.z).project(this.camera);
+      const x = Math.round((v.x * 0.5 + 0.5) * W), y = Math.round((-v.y * 0.5 + 0.5) * H);
+      ctx.font = canvasFont(18); ctx.textAlign = 'center'; ctx.fillStyle = '#ffb060'; ctx.fillText('✝', x, y);
+      const reviver = this.heroes.find((o) => o.reviveTarget === h);
+      if (reviver) { ctx.fillStyle = '#000'; ctx.fillRect(x - 21, y + 8, 42, 6); ctx.fillStyle = '#ffb060'; ctx.fillRect(x - 20, y + 9, Math.round(40 * Math.min(1, reviver.reviveProgress / RAISE_TIME)), 4); }
     }
     // downed heroes: death save pips
     for (const h of this.heroes) {
       if (!h.downed) continue;
       v.set(h.pos.x, 2.6, h.pos.z).project(this.camera);
       const x = Math.round((v.x * 0.5 + 0.5) * W), y = Math.round((-v.y * 0.5 + 0.5) * H);
-      ctx.font = '16px VT323'; ctx.textAlign = 'center';
+      ctx.font = canvasFont(16); ctx.textAlign = 'center';
       ctx.fillStyle = '#7dff8a'; ctx.fillText('✓'.repeat(h.deathSaves.s) + '·'.repeat(3 - h.deathSaves.s), x - 16, y);
       ctx.fillStyle = '#ff4a4a'; ctx.fillText('✗'.repeat(Math.min(3, h.deathSaves.f)) + '·'.repeat(Math.max(0, 3 - h.deathSaves.f)), x + 16, y);
       const reviver = this.heroes.find((o) => o.reviveTarget === h);

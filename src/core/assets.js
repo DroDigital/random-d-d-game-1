@@ -84,6 +84,9 @@ export async function loadFonts() {
     ['Fell', 'fonts/fell.woff2', {}],
     ['Fell', 'fonts/fell-italic.woff2', { style: 'italic' }],
     ['VT323', 'fonts/vt323.woff2', {}],
+    // subsets of Noto Serif SC / JP containing only the glyphs our translations use
+    ['Ashen SC', 'assets/fonts/ashen-sc.woff2', {}],
+    ['Ashen JP', 'assets/fonts/ashen-jp.woff2', {}],
   ];
   await Promise.all(fonts.map(async ([fam, p, desc]) => {
     try {

@@ -5,11 +5,12 @@ import { ANIMSETS, AFFIXES } from '../data/enemies.js';
 import { enemyAttack, heroSave, applyDamage } from './combat.js';
 import { rollDice, rng, frand, CR_XP } from '../core/rules.js';
 import { audio } from '../core/audio.js';
+import { t } from '../i18n/index.js';
 
 export class Enemy extends Actor {
   constructor(game, def, { elite = false, affixes = [], scale = 1, thrall = false } = {}) {
     super(game);
-    this.def = def; this.name = def.name; this.isEnemy = true;
+    this.def = def; this.isEnemy = true;
     this.anims = { ...ANIMSETS[def.anim], ...(def.animOverride || {}) };
     const party = game.heroes.length;
     const hpScale = (1 + 0.38 * (party - 1)) * (1 + game.depthIndex * 0.12) * (elite ? 2.2 : 1) * scale;
@@ -37,6 +38,7 @@ export class Enemy extends Actor {
     if (this.affixes.includes('swift')) { this.speed *= 1.4; this.cdMul *= 0.7; }
     this.sneakCd = 0;
   }
+  get name() { return t(this.def.name); }
   get ac() { return this.baseAC - (this.has('withered') ? 2 : 0); }
   effectiveAC(attacker) {
     let ac = this.ac;

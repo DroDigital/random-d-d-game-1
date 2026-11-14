@@ -6,6 +6,7 @@ import { audio, audioSettings } from './core/audio.js';
 import { input } from './core/input.js';
 import { meta } from './core/meta.js';
 import { settings as psxSettings } from './render/psx.js';
+import { setLang, detectLang } from './i18n/index.js';
 
 const bootFill = document.getElementById('boot-fill');
 const bootNote = document.getElementById('boot-note');
@@ -14,6 +15,7 @@ async function main() {
   // restore settings
   const s = meta.data.settings;
   if (s) { Object.assign(psxSettings, s.psx || {}); Object.assign(audioSettings, s.audio || {}); }
+  setLang((s && s.lang) || detectLang());
   await loadFonts();
   const game = new Game();
   game.showLog = s ? s.showLog !== false : true;
@@ -33,6 +35,7 @@ async function main() {
     await game.startRun(players, game.vowsChosen);
     ui.buildHud();
   };
+  game.onLanguageChange = () => { if (ui.hudEls.length) ui.buildHud(); };
   game.resume = () => { game.paused = false; ui.setScreen(null); ui.onBack = null; };
   game.abandon = () => { game.mode = 'over'; const m = game.endRun(false); ui.showEnd(false, m); };
   game.toTitle = async () => {
