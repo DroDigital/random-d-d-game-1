@@ -1,0 +1,21 @@
+{
+  "name": "ashen-oath",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ashen Oath - a local co-op D&D 5e souls-like roguelite (1-4 players) that runs in any browser, no engine required.",
+  "license": "MIT",
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "watch": "node tools/build.mjs --watch",
+    "check": "node tools/smoke-test.mjs"
+  },
+  "devDependencies": {
+    "@fontsource/im-fell-english": "^5.3.0",
+    "@fontsource/im-fell-english-sc": "^5.3.0",
+    "@fontsource/vt323": "^5.3.0",
+    "esbuild": "^0.28.2",
+    "howler": "^2.2.4",
+    "rot-js": "^2.2.1",
+    "three": "^0.170.0"
+  }
+}
