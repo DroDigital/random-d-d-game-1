@@ -94,13 +94,13 @@ export class FX {
   }
 
   // ---- ground decals (telegraphs, scorch, sigils)
-  decal(tex, { x, z, size = 3, color = 0xffffff, life = 1, opacity = 0.8, additive = true, rot = 0, fadeIn = 0, y = 0.08 }) {
+  decal(tex, { x, z, size = 3, color = 0xffffff, life = 1, opacity = 0.8, additive = true, rot = 0, fadeIn = 0, y = 0.08, grow = 0 }) {
     const mat = new THREE.MeshBasicMaterial({ map: this.tex[tex] || null, color, transparent: true, opacity: 0, depthWrite: false,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending });
     const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
     m.rotation.x = -Math.PI / 2; m.rotation.z = rot; m.position.set(x, y, z);
     this.group.add(m);
-    const d = { mesh: m, life, max: life, opacity, fadeIn };
+    const d = { mesh: m, life, max: life, opacity, fadeIn, grow };
     this.decals.push(d);
     return d;
   }
@@ -138,7 +138,7 @@ export class FX {
   removeDecal(d) { if (d) d.life = 0; }
 
   // a flat slash arc sprite in front of an attacker
-  slash(x, z, angle, { size = 4, color = 0xfff1d0, tex = 'slash_03', life = 0.18, y = 1.3 } = {}) {
+  slash(x, z, angle, { size = 4, color = 0xfff1d0, tex = 'slash_03', life = 0.2, y = 1.3 } = {}) {
     const mat = new THREE.MeshBasicMaterial({ map: this.tex[tex], color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
     const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size), mat);
     m.rotation.x = -Math.PI / 2; m.rotation.z = angle - Math.PI / 2;
@@ -148,8 +148,8 @@ export class FX {
   }
 
   // ---- floating text (drawn on the overlay canvas each frame)
-  text(str, x, y, z, { color = '#fff', size = 1, life = 1.0, vy = 1.6, big = false, drift = 0 } = {}) {
-    this.texts.push({ str: t(String(str)), x, y, z, color, size, life, max: life, vy, big, drift: drift || frand(-0.4, 0.4) });
+  text(str, x, y, z, { color = '#fff', size = 1, life = 1.0, vy = 1.6, big = false, drift = 0, shake = false } = {}) {
+    this.texts.push({ str: t(String(str)), x, y, z, color, size, life, max: life, vy: vy * (big ? 1.3 : 1), big, shake, drift: drift || frand(-0.4, 0.4) });
   }
 
   // ---- 3D d20 that tumbles and lands showing the roll
@@ -189,6 +189,7 @@ export class FX {
       else {
         const fin = d.fadeIn ? Math.min(1, (d.max - d.life) / d.fadeIn) : 1;
         d.mesh.material.opacity = d.opacity * Math.min(1, k * 3) * fin;
+        if (d.grow) d.mesh.scale.setScalar(1 + (1 - k) * d.grow);
       }
       if (d.life <= 0) { this.group.remove(d.mesh); d.mesh.geometry.dispose(); d.mesh.material.dispose(); this.decals.splice(i, 1); }
     }
@@ -231,15 +232,18 @@ export class FX {
       v.set(t.x, t.y, t.z).project(camera);
       if (v.z > 1) continue;
       const sx = Math.round((v.x * 0.5 + 0.5) * w), sy = Math.round((-v.y * 0.5 + 0.5) * h);
-      const k = t.life / t.max;
-      const pop = t.max - t.life < 0.08 ? 1.4 : 1;
+      const k = t.life / t.max, age = t.max - t.life;
+      // punch in big, settle, then fade; crits shudder for a moment
+      const pop = age < 0.16 ? 1 + (1 - age / 0.16) * (t.big ? 1.1 : 0.55) : 1;
       const px = Math.round((t.big ? 22 : 14) * t.size * pop);
+      const jx = t.shake && age < 0.35 ? Math.round(Math.sin(age * 90) * 3) : 0;
       ctx.font = canvasFont(px);
       ctx.globalAlpha = Math.min(1, k * 3);
       ctx.fillStyle = '#000';
-      ctx.fillText(t.str, sx + 1, sy + 1); ctx.fillText(t.str, sx - 1, sy + 1);
-      ctx.fillStyle = t.color;
-      ctx.fillText(t.str, sx, sy);
+      const o = t.big ? 2 : 1;
+      ctx.fillText(t.str, sx + jx + o, sy + o); ctx.fillText(t.str, sx + jx - o, sy + o); ctx.fillText(t.str, sx + jx, sy - o);
+      ctx.fillStyle = age < 0.05 ? '#ffffff' : t.color;
+      ctx.fillText(t.str, sx + jx, sy);
     }
     ctx.globalAlpha = 1;
   }

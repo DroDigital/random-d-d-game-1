@@ -97,7 +97,7 @@ uniform sampler2D tColor; uniform sampler2D tDepth;
 uniform vec2 uRes; uniform float uNear; uniform float uFar; uniform float uTime;
 uniform vec3 uRamp0; uniform vec3 uRamp1; uniform vec3 uRamp2; uniform vec3 uRamp3; uniform vec3 uInk;
 uniform float uGrade; uniform float uDither; uniform float uOutline; uniform float uScan;
-uniform float uFlash; uniform vec3 uFlashColor; uniform float uDesat; uniform float uVignette;
+uniform float uFlash; uniform vec3 uFlashColor; uniform float uDesat; uniform float uVignette; uniform float uAberr; uniform float uHurt;
 
 float linDepth(vec2 uv){
   float z = texture2D(tDepth, uv).x;
@@ -124,6 +124,12 @@ void main(){
   vec2 px = floor(vUv * uRes);
   vec2 uv = (px + 0.5) / uRes;
   vec3 c = texture2D(tColor, uv).rgb;
+  // chromatic split on big hits (crits, killing blows)
+  if (uAberr > 0.003) {
+    vec2 o = (uv - 0.5) * uAberr * 0.03;
+    c.r = texture2D(tColor, uv + o).r;
+    c.b = texture2D(tColor, uv - o).b;
+  }
 
   // woodcut ink outline from depth discontinuities
   if (uOutline > 0.0) {
@@ -152,6 +158,8 @@ void main(){
   // vignette
   vec2 q = vUv - 0.5;
   c *= 1.0 - dot(q, q) * uVignette;
+  // red edges when hurt / low on health
+  if (uHurt > 0.003) c = mix(c, vec3(0.55, 0.02, 0.0), uHurt * smoothstep(0.3, 0.85, length(q)));
 
   // damage / event flash
   c = mix(c, uFlashColor, uFlash);
@@ -183,7 +191,7 @@ export class PSXRenderer {
         uRamp0: { value: new THREE.Color() }, uRamp1: { value: new THREE.Color() },
         uRamp2: { value: new THREE.Color() }, uRamp3: { value: new THREE.Color() }, uInk: { value: new THREE.Color() },
         uGrade: { value: 0.5 }, uDither: { value: 1 }, uOutline: { value: 1 }, uScan: { value: 0 },
-        uFlash: { value: 0 }, uFlashColor: { value: new THREE.Color(1, 0, 0) }, uDesat: { value: 0 }, uVignette: { value: 1.4 },
+        uFlash: { value: 0 }, uFlashColor: { value: new THREE.Color(1, 0, 0) }, uDesat: { value: 0 }, uVignette: { value: 1.4 }, uAberr: { value: 0 }, uHurt: { value: 0 },
       },
     });
     this.postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.post));

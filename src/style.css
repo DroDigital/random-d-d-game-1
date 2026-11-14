@@ -168,3 +168,47 @@ i.gi { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.25
 html[lang="ja"] { --cjk: 'Ashen JP', 'Noto Serif CJK JP', 'Source Han Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', 'MS Mincho', 'Noto Sans CJK JP', 'Meiryo'; }
 html.cjk .pskills, html.cjk .bc-desc, html.cjk .pblurb, html.cjk .help p { line-height: 1.5; }
 html.cjk .menu-title, html.cjk .banner-text, html.cjk .title-logo .t2 { letter-spacing: 0.04em; }
+
+/* ---------- button glyphs (keyboard keycaps / gamepad buttons) ---------- */
+:root { --ui-scale: 1; }
+.btn { display: inline-flex; align-items: center; justify-content: center; font-family: VT323, var(--cjk), monospace; font-size: 14px; line-height: 1; color: #fff; text-shadow: 0 1px 0 #000; vertical-align: middle; margin: 0 1px; }
+.btn.face { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.6); box-shadow: inset 0 -2px 0 rgba(0,0,0,0.35); }
+.btn.face-A { background: #3f9b48; } .btn.face-B { background: #c2402f; } .btn.face-X { background: #3b6fc4; } .btn.face-Y { background: #c9a227; color: #1a1408; text-shadow: none; }
+.btn.pill { padding: 2px 6px; border-radius: 8px; background: #2a2630; border: 1px solid #5a5260; }
+
+/* ---------- floating world tooltips ---------- */
+.layer-tips { pointer-events: none; }
+.world-tip { position: absolute; transform: translate(-50%, -100%) scale(calc(var(--ui-scale) * 0.92)); transform-origin: 50% 100%; white-space: nowrap; padding: 4px 9px; background: rgba(8,6,10,0.82); border: 1px solid color-mix(in srgb, var(--pc) 70%, transparent); border-bottom-width: 2px; font-size: 15px; opacity: 0.55; transition: opacity 0.15s, transform 0.15s; animation: tipIn 0.2s ease-out; }
+.world-tip.near { opacity: 1; transform: translate(-50%, -100%) scale(var(--ui-scale)); box-shadow: 0 0 14px color-mix(in srgb, var(--pc) 45%, transparent); }
+.world-tip::after { content: ''; position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); border: 5px solid transparent; border-top-color: color-mix(in srgb, var(--pc) 70%, transparent); }
+@keyframes tipIn { from { opacity: 0; margin-top: 8px; } }
+
+/* ---------- per-player control hints ---------- */
+.hud-p .hint { position: absolute; left: 0; bottom: calc(100% + 6px); max-width: 300px; padding: 5px 10px; background: rgba(8,6,10,0.9); border-left: 3px solid var(--pc); font-size: 15px; opacity: 0; transform: translateY(6px); transition: opacity 0.25s, transform 0.25s; pointer-events: none; }
+.hud-p1 .hint, .hud-p3 .hint { left: auto; right: 0; border-left: none; border-right: 3px solid var(--pc); }
+.hud-p2 .hint, .hud-p3 .hint { bottom: auto; top: calc(100% + 6px); }
+.hud-p .hint.show { opacity: 1; transform: none; }
+.hud-p .hint.urgent { border-color: #ffb347; animation: hintPulse 0.9s ease-in-out infinite; }
+@keyframes hintPulse { 50% { box-shadow: 0 0 14px rgba(255,179,71,0.55); } }
+
+/* ---------- HUD juice ---------- */
+.bar .lag { position: absolute; inset: 0; width: 100%; background: #f4e6c8; opacity: 0.85; }
+.hud-p.hurt { animation: hudHurt 0.32s ease-out; }
+@keyframes hudHurt { 0% { transform: translate(var(--shake), 0); background: rgba(120,10,10,0.75); } 25% { transform: translate(calc(var(--shake) * -1), 1px); } 50% { transform: translate(calc(var(--shake) * 0.5), -1px); } 100% { transform: none; } }
+.sk.ready { animation: skReady 0.45s ease-out; }
+@keyframes skReady { 0% { box-shadow: 0 0 0 0 rgba(255,230,160,0.9); filter: brightness(2.2); } 100% { box-shadow: 0 0 0 10px rgba(255,230,160,0); filter: none; } }
+.hud-top .ash.bump { animation: ashBump 0.25s ease-out; }
+@keyframes ashBump { 40% { transform: scale(1.18); color: #ffd28a; } }
+.layer-banner.show .banner-in, .layer-banner.show .boss-intro { animation: bannerIn 0.45s cubic-bezier(.2,1.4,.4,1); }
+@keyframes bannerIn { from { transform: scale(1.25); opacity: 0; letter-spacing: 0.3em; } }
+.ppanel { animation: panelIn 0.28s cubic-bezier(.2,1.3,.4,1); }
+@keyframes panelIn { from { transform: translateY(24px) scale(0.94); opacity: 0; } }
+.ppanel.guarded .pp-opt { opacity: 0.45; filter: grayscale(0.6); pointer-events: none; }
+.ppanel.guarded .pp-keys::before { content: '…'; margin-right: 6px; }
+.menu { animation: panelIn 0.25s ease-out; }
+.pkeys { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 8px; text-align: left; font-size: 13px; color: var(--ash); margin-top: 4px; }
+
+/* ---------- UI scale ---------- */
+.hud-p, .hud-top, .ppanel, .menu, .select, .bossbar, .layer-log, .banner-in, .boss-intro, .layer-toast { zoom: var(--ui-scale); }
+.menu { max-height: calc(92vh / var(--ui-scale)); }
+.select { width: calc(96vw / var(--ui-scale)); }

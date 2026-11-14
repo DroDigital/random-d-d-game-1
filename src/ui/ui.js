@@ -11,6 +11,7 @@ import { settings as psx } from '../render/psx.js';
 import { draftBoons } from '../world/run.js';
 import { t, LANGUAGES, getLang, setLang } from '../i18n/index.js';
 import { DEPTHS } from '../data/world.js';
+import { Hints } from './hints.js';
 
 const COND = { rage: 'RAGE', surge: 'ACTION SURGE', slowed: 'SLOWED', poisoned: 'POISONED', frightened: 'FRIGHTENED', hexed: 'HEXED', prone: 'PRONE', shadowAdv: 'HIDDEN', alert: 'ALERT', whirl: 'WHIRL', reckless: 'RECKLESS', fumbled: 'FUMBLED', dash: 'DASH', chilled: 'CHILLED', frozen: 'FROZEN' };
 export const ctrlLabel = (c) => (c ? (c.layout ? t(c.label) : t('Gamepad {0}', c.padIndex + 1)) : '');
@@ -20,6 +21,17 @@ const h = (tag, cls, html) => { const e = document.createElement(tag); if (cls) 
 const icon = (name, color = 'currentColor') => `<i class="gi" style="--c:${color};-webkit-mask-image:url('${url('assets/icons/' + name + '.svg')}');mask-image:url('${url('assets/icons/' + name + '.svg')}')"></i>`;
 const img = (path, cls = 'px') => `<img class="${cls}" src="${url(path)}" alt="">`;
 const keycap = (k) => `<span class="key">${k}</span>`;
+// device-aware button glyph: keycaps for keyboards, coloured face buttons for pads
+export function glyphHTML(ctrl, action) {
+  if (!ctrl) return '';
+  const g = ctrl.glyph[action];
+  if (!g) return '';
+  if (ctrl.type === 'gamepad') {
+    const face = ['A', 'B', 'X', 'Y'].includes(g);
+    return `<span class="btn ${face ? 'face face-' + g : 'pill'}">${g}</span>`;
+  }
+  return keycap(g);
+}
 
 export class UI {
   constructor(game) {
@@ -33,9 +45,17 @@ export class UI {
     this.root.innerHTML = '';
     document.documentElement.style.setProperty('--border', `url("${url('assets/ui/border-011.png')}")`);
     this.layer = {};
-    for (const n of ['screen', 'hud', 'panels', 'banner', 'fade', 'toast', 'boss', 'log', 'prompt']) { this.layer[n] = h('div', 'layer layer-' + n); this.root.appendChild(this.layer[n]); }
+    this.hints = new Hints(this);
+    this.applyScale();
+    for (const n of ['tips', 'screen', 'hud', 'panels', 'banner', 'fade', 'toast', 'boss', 'log', 'prompt']) { this.layer[n] = h('div', 'layer layer-' + n); this.root.appendChild(this.layer[n]); }
     document.addEventListener('mousedown', () => audio.unlock());
     document.addEventListener('keydown', () => audio.unlock());
+  }
+
+  glyph(ctrl, action) { return glyphHTML(ctrl, action); }
+  applyScale() {
+    const sc = (meta.data.settings && meta.data.settings.uiScale) || 1;
+    document.documentElement.style.setProperty('--ui-scale', sc);
   }
 
   // ------------------------------------------------------------ generic
@@ -93,6 +113,7 @@ export class UI {
 
   showTitle() {
     this.onBack = null;
+    this.clearTips();
     this.layer.hud.innerHTML = ''; this.layer.boss.innerHTML = '';
     audio.music('title');
     this.setScreen('title', () => {
@@ -143,6 +164,8 @@ export class UI {
     const toggle = (k) => () => { psx[k] = !psx[k]; this.game.psx.applySettings(); this.saveSettings(); };
     const items = [
       opt('Language', () => LANGUAGES.find((l) => l.id === getLang()).name, (d) => { const i = LANGUAGES.findIndex((l) => l.id === getLang()); setLang(LANGUAGES[(i + d + LANGUAGES.length) % LANGUAGES.length].id); this.saveSettings(); this.game.onLanguageChange && this.game.onLanguageChange(); }),
+      opt('UI scale', () => Math.round(((meta.data.settings && meta.data.settings.uiScale) || 1) * 100) + '%', (d) => { const st = meta.data.settings = meta.data.settings || {}; st.uiScale = Math.round(Math.max(0.7, Math.min(1.6, (st.uiScale || 1) + d * 0.1)) * 10) / 10; this.applyScale(); this.saveSettings(); }),
+      opt('Control hints', () => t({ auto: 'Auto', on: 'Always', off: 'off' }[(meta.data.settings && meta.data.settings.hints) || 'auto']), (d) => { const st = meta.data.settings = meta.data.settings || {}; const m = ['auto', 'on', 'off']; st.hints = m[(m.indexOf(st.hints || 'auto') + d + 3) % 3]; if (st.hints === 'on') meta.data.hintsDone = {}; this.saveSettings(); }),
       opt('Resolution', () => psx.height + 'p', (d) => { const r = [180, 240, 300, 360, 480]; psx.height = r[(r.indexOf(psx.height) + d + r.length) % r.length]; this.game.psx.applySettings(); this.saveSettings(); }),
       opt('Vertex wobble', () => t(psx.jitter ? 'on' : 'off'), toggle('jitter')),
       opt('Texture warp', () => t(psx.affine ? 'on' : 'off'), toggle('affine')),
@@ -161,17 +184,17 @@ export class UI {
     this.menuIndex = Math.min(idx, items.length - 1); this.paintMenu();
     this.onBack = back;
   }
-  saveSettings() { meta.data.settings = { psx: { ...psx }, audio: { ...audioSettings }, showLog: this.game.showLog, lang: getLang() }; meta.save(); }
+  saveSettings() { const old = meta.data.settings || {}; meta.data.settings = { ...old, psx: { ...psx }, audio: { ...audioSettings }, showLog: this.game.showLog, lang: getLang() }; meta.save(); }
 
   showHelp() {
     this.setScreen('help', () => {
       const w = h('div', 'menu help');
       const g1 = input.controllers[0].glyph, g2 = input.controllers[1].glyph;
-      const pad = { attack: 'X', heavy: 'RT', dodge: 'A', skill1: 'LB', skill2: 'RB', potion: 'Y', interact: 'B', move: 'L-Stick' };
+      const pad = { attack: 'X', heavy: 'RT', dodge: 'A', skill1: 'LB', skill2: 'RB', potion: 'Y', interact: 'B', lock: 'R3', move: 'L-Stick' };
       const row = (n, k) => `<tr><td>${t(n)}</td><td>${keycap(g1[k])}</td><td>${keycap(g2[k])}</td><td>${keycap(pad[k])}</td></tr>`;
       w.innerHTML = `<div class="menu-title">${t('How to Play')}</div>
       <table class="controls"><tr><th></th><th>${t('Keyboard 1')}</th><th>${t('Keyboard 2')}</th><th>${t('Gamepad')}</th></tr>
-      ${row('Move', 'move')}${row('Attack', 'attack')}${row('Heavy attack', 'heavy')}${row('Dodge roll', 'dodge')}${row('Skill 1', 'skill1')}${row('Skill 2', 'skill2')}${row('Potion', 'potion')}${row('Interact / revive', 'interact')}</table>
+      ${row('Move', 'move')}${row('Attack', 'attack')}${row('Heavy attack', 'heavy')}${row('Dodge roll', 'dodge')}${row('Skill 1', 'skill1')}${row('Skill 2', 'skill2')}${row('Potion', 'potion')}${row('Interact / revive', 'interact')}${row('Lock on (Ranger, Wizard)', 'lock')}</table>
       <div class="help-cols">
       <div><h3>${t('Souls-like')}</h3><p>${t('help.souls1')}</p>
       <p>${t('help.souls2')}</p></div>
@@ -243,6 +266,7 @@ export class UI {
         <div class="pabil">${['str', 'dex', 'con', 'int', 'wis', 'cha'].map((k) => `<span><b>${t(k.toUpperCase())}</b>${c.abilities[k]}</span>`).join('')}</div>
         <div class="pblurb">${t(c.blurb)}</div>
         <div class="pskills">${c.skills.map((sk) => `<div>${icon(sk.icon, c.color)}<b>${t(sk.name)}</b><br><small>${t(sk.desc)}</small></div>`).join('')}</div>
+        <div class="pkeys">${(['move', 'attack', 'heavy', 'dodge', 'skill1', 'skill2', 'potion', 'interact'].concat(c.attack.kind !== 'melee' ? ['lock'] : [])).map((k) => `<span>${glyphHTML(ctrl, k)} ${t({ move: 'Move', attack: 'Attack', heavy: 'Heavy attack', dodge: 'Dodge roll', skill1: 'Skill 1', skill2: 'Skill 2', potion: 'Potion', interact: 'Interact / revive', lock: 'Lock on' }[k])}</span>`).join('')}</div>
         <div class="pskin">${t('Colours')}: ${s.skin ? t('Variant {0}', s.skin.replace('alt_', '')) : t('Classic')} ${meta.has('skins') ? '▴▾' : `<small>(${t('unlock: Ashen Wardrobe')})</small>`}</div>
         <div class="pready">${s.ready ? t('READY') : t('Press Attack when ready')}</div>`;
       row.appendChild(card);
@@ -300,7 +324,8 @@ export class UI {
       p.style.setProperty('--pc', hero.color);
       p.innerHTML = `
         <div class="hp-head"><span class="hp-name">P${i + 1} ${t(hero.cls.name)}</span><span class="hp-lv"></span></div>
-        <div class="bar hpbar"><div class="fill"></div><div class="temp"></div><span></span></div>
+        <div class="hint"></div>
+        <div class="bar hpbar"><div class="lag"></div><div class="fill"></div><div class="temp"></div><span></span></div>
         <div class="bar stbar"><div class="fill"></div></div>
         <div class="hp-row">
           <div class="sk sk0">${icon(hero.cls.skills[0].icon, hero.cls.color)}<div class="cd"></div><span class="kc">${hero.ctrl.glyph.skill1}</span></div>
@@ -311,7 +336,7 @@ export class UI {
         </div>
         <div class="hp-boons"></div><div class="hp-conds"></div><div class="hp-prompt"></div>`;
       hud.appendChild(p);
-      this.hudEls.push({ hero, el: p, hp: $('.hpbar .fill', p), temp: $('.hpbar .temp', p), hpt: $('.hpbar span', p), st: $('.stbar .fill', p), cd: [$('.sk0 .cd', p), $('.sk1 .cd', p)], pot: $('.pot span', p), slots: $('.slots', p), ac: $('.ac', p), lv: $('.hp-lv', p), boons: $('.hp-boons', p), conds: $('.hp-conds', p), prompt: $('.hp-prompt', p) });
+      this.hudEls.push({ hero, el: p, hint: $('.hint', p), lag: $('.hpbar .lag', p), lagW: 100, lagHold: 0, cdPrev: [0, 0], hp: $('.hpbar .fill', p), temp: $('.hpbar .temp', p), hpt: $('.hpbar span', p), st: $('.stbar .fill', p), cd: [$('.sk0 .cd', p), $('.sk1 .cd', p)], pot: $('.pot span', p), slots: $('.slots', p), ac: $('.ac', p), lv: $('.hp-lv', p), boons: $('.hp-boons', p), conds: $('.hp-conds', p), prompt: $('.hp-prompt', p) });
     });
     this.refreshHud();
   }
@@ -334,7 +359,11 @@ export class UI {
     const g = this.game;
     for (const e of this.hudEls) {
       const hero = e.hero;
-      e.hp.style.width = (100 * Math.max(0, hero.hp) / hero.maxHp) + '%';
+      const hpW = 100 * Math.max(0, hero.hp) / hero.maxHp;
+      e.hp.style.width = hpW + '%';
+      // the white "damage ghost" lingers, then drains down to the new value
+      if (hpW >= e.lagW) { e.lagW = hpW; e.lagHold = 0.35; } else if ((e.lagHold -= dt) <= 0) e.lagW = Math.max(hpW, e.lagW - dt * 60);
+      e.lag.style.width = e.lagW + '%';
       e.temp.style.width = (100 * Math.min(1, hero.tempHp / hero.maxHp)) + '%';
       e.hpt.textContent = hero.dead ? t('DEAD') : hero.downed ? `${t('DOWNED')} ${hero.deathSaves.s}✓ ${hero.deathSaves.f}✗` : `${Math.max(0, hero.hp)}/${hero.maxHp}${hero.tempHp ? ' +' + hero.tempHp : ''}`;
       e.st.style.width = Math.max(0, hero.stamina) + '%';
@@ -343,6 +372,8 @@ export class UI {
         const sk = hero.cls.skills[i];
         const cd = hero.cooldowns[i] / (sk.cd * hero.cooldownMul);
         e.cd[i].style.height = (cd * 100) + '%';
+        if (e.cdPrev[i] > 0 && cd <= 0) { const sk2 = e.cd[i].parentElement; sk2.classList.remove('ready'); void sk2.offsetWidth; sk2.classList.add('ready'); }
+        e.cdPrev[i] = cd;
         e.cd[i].parentElement.classList.toggle('noslot', !!sk.slot && hero.slots <= 0);
       }
       e.pot.textContent = hero.potions;
@@ -351,8 +382,41 @@ export class UI {
       e.conds.textContent = conds.map((c) => t(COND[c] || c.toUpperCase())).join(' · ') + (hero.exhausted ? ' · ' + t('EXHAUSTED') : '');
       e.el.classList.toggle('down', hero.downed || hero.dead);
     }
-    if (this.ashEl && g.run) this.ashEl.textContent = g.run.ash;
+    if (this.ashEl && g.run) {
+      if (+this.ashEl.textContent < g.run.ash) { const a = this.ashEl.parentElement; a.classList.remove('bump'); void a.offsetWidth; a.classList.add('bump'); }
+      this.ashEl.textContent = g.run.ash;
+    }
+    this.hints.update(dt, g);
   }
+  hurt(hero, sev) {
+    const e = this.hudEls.find((x) => x.hero === hero);
+    if (!e) return;
+    e.el.style.setProperty('--shake', (2 + sev * 6).toFixed(1) + 'px');
+    e.el.classList.remove('hurt'); void e.el.offsetWidth; e.el.classList.add('hurt');
+  }
+  // floating "press X to …" tooltips over chests, shrines, merchants, downed allies
+  worldTips(tips, camera) {
+    const layer = this.layer.tips;
+    if (!this.tipEls) this.tipEls = new Map();
+    const W = window.innerWidth, H = window.innerHeight;
+    const seen = new Set();
+    for (const tip of tips) {
+      seen.add(tip.key);
+      let el = this.tipEls.get(tip.key);
+      if (!el) { el = h('div', 'world-tip'); layer.appendChild(el); this.tipEls.set(tip.key, el); el.dataset.html = ''; }
+      const html = `${glyphHTML(tip.hero.ctrl, tip.action || 'interact')} <span>${t(tip.text, ...(tip.args || []))}</span>`;
+      if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+      el.style.setProperty('--pc', tip.hero.color);
+      const v = tip.pos.clone().project(camera);
+      el.style.left = ((v.x * 0.5 + 0.5) * W) + 'px';
+      el.style.top = ((-v.y * 0.5 + 0.5) * H) + 'px';
+      el.classList.toggle('near', !!tip.inRange);
+      el.style.opacity = v.z > 1 ? 0 : '';
+    }
+    for (const [k, el] of this.tipEls) if (!seen.has(k)) { el.remove(); this.tipEls.delete(k); }
+  }
+  clearTips() { if (this.tipEls) { for (const el of this.tipEls.values()) el.remove(); this.tipEls.clear(); } }
+
   prompts(list) {
     for (const e of this.hudEls) {
       const p = list.find((x) => x.hero === e.hero);
@@ -390,7 +454,11 @@ export class UI {
     el.style.setProperty('--pc', hero.color);
     el.style.order = hero.slot;
     this.layer.panels.appendChild(el);
-    const panel = { hero, el, spec, index: 0 };
+    // guard against mashing attack into a choice right after a kill: ignore input for a
+    // moment, and until the attack/confirm buttons have been released
+    const guard = spec.guard ?? 0.9;
+    const panel = { hero, el, spec, index: 0, lockT: guard, needRelease: guard > 0 };
+    if (guard > 0) el.classList.add('guarded');
     this.panels.set(hero, panel);
     this.paintPanel(panel);
     audio.play('open', { vol: 0.4 });
@@ -415,6 +483,12 @@ export class UI {
   panelInput() {
     for (const p of [...this.panels.values()]) {
       const c = p.hero.ctrl; if (!c) continue;
+      if (p.lockT > 0 || p.needRelease) {
+        p.lockT -= this.game.realDt || 0.016;
+        if (p.needRelease && !c.held.attack && !c.held.confirm && !c.held.interact) p.needRelease = false;
+        if (p.lockT <= 0 && !p.needRelease) { p.el.classList.remove('guarded'); for (const k of ['attack', 'confirm', 'interact', 'back', 'dodge', 'skill2']) c.consume(k); }
+        continue;
+      }
       const vertical = !p.spec.cards;
       const prevKey = vertical ? 'up' : 'left', nextKey = vertical ? 'down' : 'right';
       if (c.nav === prevKey || c.nav === nextKey) { p.index = (p.index + (c.nav === nextKey ? 1 : p.count - 1)) % p.count; audio.play('move', { vol: 0.25 }); this.paintPanel(p); }
@@ -448,7 +522,7 @@ export class UI {
   openShrine(hero) {
     const g = this.game;
     this.openPanel(hero, {
-      title: t('Ember Shrine'),
+      title: t('Ember Shrine'), guard: 0.25,
       sub: () => `${t('Party Ash')}: <b>${g.run.ash}</b> · ${t('HP')} ${hero.hp}/${hero.maxHp}`,
       options: () => {
         const cost = LEVEL_COST[hero.level];
@@ -465,7 +539,7 @@ export class UI {
     const g = this.game;
     if (!g.shopStock) g.shopStock = new Set();
     this.openPanel(hero, {
-      title: t('Ossa the Ash-Merchant'),
+      title: t('Ossa the Ash-Merchant'), guard: 0.25,
       sub: () => `${t('Party Ash')}: <b>${g.run.ash}</b>`,
       options: () => SHOP_ITEMS.map((it) => {
         const cost = Math.round(it.cost * (1 + g.run.depthIndex * 0.25));
@@ -488,7 +562,7 @@ export class UI {
     const g = this.game;
     if (g.altarRolled.has(hero)) { this.toast(t('{0} has already tempted fate here.', hero.label)); return; }
     this.openPanel(hero, {
-      title: t("The Dicer's Altar"),
+      title: t("The Dicer's Altar"), guard: 0.25,
       sub: () => t('altar.rules'),
       options: () => [
         { html: `${icon('dice-twenty-faces-twenty', '#ff7ad0')} ${t('Roll the bones')}`, action: () => { g.altarRolled.add(hero); this.altarRoll(hero); return false; } },
@@ -524,7 +598,7 @@ export class UI {
 
   showEnd(won, marks) {
     const g = this.game, r = g.run;
-    this.closeAllPanels();
+    this.closeAllPanels(); this.clearTips();
     this.layer.boss.innerHTML = ''; this.bossEl = null;
     const mins = Math.floor((Date.now() - r.startTime) / 60000);
     this.setScreen('end', () => {

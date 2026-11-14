@@ -82,6 +82,12 @@ export class Actor {
     this.visualFacing += d * Math.min(1, dt * 18);
     this.model.root.position.set(this.pos.x, this.pos.y + this.hover, this.pos.z);
     this.model.root.rotation.y = Math.PI / 2 - this.visualFacing;
+    // squash & stretch pop when hit (holds during hitstop, which sells the impact)
+    if (this.pop > 0) {
+      this.pop = Math.max(0, this.pop - dt * 5);
+      const p = this.pop;
+      this.model.root.scale.set(1 + 0.22 * p, 1 - 0.2 * p, 1 + 0.22 * p);
+    } else if (this.model.root.scale.x !== 1) this.model.root.scale.set(1, 1, 1);
     if (this.shadow) this.shadow.position.set(this.pos.x, 0.06, this.pos.z);
   }
 }
