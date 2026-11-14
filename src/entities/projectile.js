@@ -77,6 +77,7 @@ export class Projectile {
     if (this.look.model) this.obj.rotation.y = Math.PI / 2 - this.angle;
     else this.obj.material.rotation = -this.angle;
     if (this.light) { this.light.position.set(this.x, this.y + 0.5, this.z); }
+    if (this.look.model && Math.random() < 0.8) g.fx.spawn('spark_04', { x: this.x, y: this.y, z: this.z, life: 0.16, size: 0.32, grow: -0.3, color: this.look.color, opacity: 0.7 });
     if (this.look.trail && Math.random() < 0.7) g.fx.spawn(this.look.trail, { x: this.x, y: this.y, z: this.z, life: 0.25, size: this.look.size * 0.8, grow: -0.5, color: this.look.color });
 
     if (this.kind === 'fireball' && this.dist >= this.travel) { this.explode(); return; }

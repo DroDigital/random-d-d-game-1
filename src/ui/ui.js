@@ -69,7 +69,7 @@ export class UI {
   roomTitle(name, sub) { this.roomName = t(name); this.roomSub = sub; }
   toast(msg) { this.layer.toast.textContent = t(msg); this.layer.toast.classList.add('show'); clearTimeout(this.toastTimer); this.toastTimer = setTimeout(() => this.layer.toast.classList.remove('show'), 1800); }
   updateLog(lines) {
-    if (!this.game.showLog) { this.layer.log.innerHTML = ''; return; }
+    if (!this.game.showLog || this.screen === 'end') { this.layer.log.innerHTML = ''; return; }
     this.layer.log.innerHTML = lines.map((l) => `<div style="color:${l.color}">${l.msg}</div>`).join('');
   }
 
@@ -171,6 +171,7 @@ export class UI {
       opt('Texture warp', () => t(psx.affine ? 'on' : 'off'), toggle('affine')),
       opt('Dithering', () => t(psx.dither ? 'on' : 'off'), toggle('dither')),
       opt('Ink outlines', () => t(psx.outline ? 'on' : 'off'), toggle('outline')),
+      opt('Bloom', () => t(psx.bloom !== false ? 'on' : 'off'), () => { psx.bloom = psx.bloom === false; this.saveSettings(); }),
       opt('Scanlines', () => t(psx.scanlines ? 'on' : 'off'), toggle('scanlines')),
       opt('Palette grade', () => Math.round(psx.grade * 100) + '%', (d) => { psx.grade = Math.max(0, Math.min(1.6, psx.grade + d * 0.2)); this.saveSettings(); }),
       opt('Music', () => Math.round(audioSettings.music * 100) + '%', (d) => { audioSettings.music = Math.max(0, Math.min(1, audioSettings.music + d * 0.1)); audio.refreshVolume(); this.saveSettings(); }),
@@ -432,8 +433,9 @@ export class UI {
   }
   bossBar(boss) {
     const el = this.layer.boss;
-    if (!boss) { el.innerHTML = ''; this.bossEl = null; return; }
-    if (!this.bossEl) {
+    if (!boss) { el.innerHTML = ''; this.bossEl = null; this.bossFor = null; return; }
+    if (!this.bossEl || this.bossFor !== boss) {
+      this.bossFor = boss;
       el.innerHTML = `<div class="bossbar"><div class="bname">${t(boss.def.name)} <small>${t(boss.def.title)}</small></div><div class="bbar"><div class="fill"></div><div class="poise"></div></div><div class="binfo"></div></div>`;
       this.bossEl = { fill: $('.fill', el), poise: $('.poise', el), info: $('.binfo', el) };
     }
@@ -599,7 +601,8 @@ export class UI {
   showEnd(won, marks) {
     const g = this.game, r = g.run;
     this.closeAllPanels(); this.clearTips();
-    this.layer.boss.innerHTML = ''; this.bossEl = null;
+    this.layer.boss.innerHTML = ''; this.bossEl = null; this.bossFor = null;
+    this.layer.hud.innerHTML = ''; this.hudEls = []; this.layer.log.innerHTML = '';
     const mins = Math.floor((Date.now() - r.startTime) / 60000);
     this.setScreen('end', () => {
       const w = h('div', 'menu end');
@@ -607,7 +610,7 @@ export class UI {
         <div class="menu-sub">${won ? t('Cindermaw lies cold. The Abyss sleeps.') : t('Fell in {0}, room {1}.', t(r.depth.name), r.roomIndex)} · ${t('{0} min · {1} rooms · {2} bosses · seed {3}', mins, r.roomsCleared, r.bossesSlain, r.seed)}</div>
         <div class="end-heroes">${g.heroes.map((x) => `<div class="eh" style="--pc:${x.color}"><b>P${x.slot + 1} ${t(x.cls.name)}</b> ${t('Lv {0}', x.level)}<br>${t('Damage')} ${x.stats.dealt} · ${t('Kills')} ${x.stats.kills}<br>${t('Crits')} ${x.stats.crits} · ${t('Nat 20s')} ${x.stats.nat20}<br>${t('Revives')} ${x.stats.revives} · ${t('Downs')} ${x.stats.downs}<div class="eb">${x.boons.map((b) => `<img class="px" title="${t(b.name)}" src="${url(b.icon)}">`).join('')}</div></div>`).join('')}</div>
         <div class="marks">+${marks} ${t('Oath Marks')} ✦ <small>(${t('total {0}', meta.data.marks)})</small></div>`;
-      w.appendChild(this.menu([{ label: t('Return to the Shrine'), action: () => this.game.toTitle() }]));
+      w.appendChild(this.menu([{ label: t('Return to the Shrine'), action: () => this.game.toTitle() }], { cls: 'bare' }));
       return w;
     });
     this.onBack = null;

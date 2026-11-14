@@ -27,8 +27,10 @@ i.gi { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.25
 .boot-note { margin-top: 12px; font-family: VT323, var(--cjk), monospace; color: var(--ash); font-size: 18px; }
 
 /* fade / banners / toast */
-.layer-fade { background: #000; opacity: 0; transition: opacity 0.35s; }
-.layer-fade.on { opacity: 1; }
+@property --iris { syntax: '<percentage>'; inherits: false; initial-value: 140%; }
+/* room transition: an iris of ash closes on the party, then opens on the new room */
+.layer-fade { --iris: 140%; opacity: 0; background: radial-gradient(circle at 50% 58%, transparent calc(var(--iris) - 14%), rgba(255,120,40,0.35) calc(var(--iris) - 6%), #000 var(--iris)); transition: --iris 0.36s cubic-bezier(.6,0,.9,.4), opacity 0.36s step-end; }
+.layer-fade.on { --iris: 0%; opacity: 1; transition: --iris 0.36s cubic-bezier(.3,.2,.4,1), opacity 0s; }
 .layer-banner { display: flex; align-items: flex-start; justify-content: center; padding-top: 16vh; opacity: 0; transition: opacity 0.4s; }
 .layer-banner.show { opacity: 1; }
 .banner-in, .boss-intro { text-align: center; padding: 14px 60px; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.75) 20%, rgba(0,0,0,0.75) 80%, transparent); }
@@ -212,3 +214,10 @@ html.cjk .menu-title, html.cjk .banner-text, html.cjk .title-logo .t2 { letter-s
 .hud-p, .hud-top, .ppanel, .menu, .select, .bossbar, .layer-log, .banner-in, .boss-intro, .layer-toast { zoom: var(--ui-scale); }
 .menu { max-height: calc(92vh / var(--ui-scale)); }
 .select { width: calc(96vw / var(--ui-scale)); }
+
+/* end screen: the button list sits inside the panel without a second frame */
+.menu.bare { min-width: 0; padding: 4px 0 0; background: none; border: none; border-image: none; animation: none; }
+/* title: menu to the left so the hero lineup around the shrine stays visible */
+.title-screen { position: relative; }
+.title-screen .title-menu { position: absolute; left: max(4vw, 24px); top: 30vh; min-width: 300px; background: linear-gradient(90deg, rgba(6,5,8,0.82), rgba(6,5,8,0.55)); text-align: left; }
+.title-screen .title-menu .menu-item { text-align: left; }

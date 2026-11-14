@@ -14,7 +14,7 @@ export const psxUniforms = {
 };
 
 export const settings = {
-  height: 240, jitter: true, affine: true, dither: true, outline: true, scanlines: false, grade: 1.0,
+  height: 240, jitter: true, affine: true, dither: true, outline: true, scanlines: false, grade: 1.0, bloom: true,
 };
 
 // Patch any built-in material so it wobbles and warps like a PS1.
@@ -53,6 +53,35 @@ export function psxify(material) {
         #endif`);
   };
   material.customProgramCacheKey = () => 'psx' + (material.map ? 1 : 0);
+  return material;
+}
+
+// Rim light: a fresnel edge glow that separates characters from dark floors.
+// Heroes get a warm ember rim, foes a per-depth cold rim. Shared uniforms so
+// one write recolours every actor.
+export const rimUniforms = {
+  hero: { color: { value: new THREE.Color(1.0, 0.72, 0.42) }, str: { value: 0.75 } },
+  foe: { color: { value: new THREE.Color(0.55, 0.7, 1.0) }, str: { value: 0.6 } },
+};
+export function addRim(material, kind) {
+  const u = rimUniforms[kind];
+  if (!u) return material;
+  material.userData.psx = false;
+  const prevRim = material.onBeforeCompile;
+  material.onBeforeCompile = (shader, r) => {
+    if (prevRim && prevRim !== THREE.Material.prototype.onBeforeCompile) prevRim(shader, r);
+    shader.uniforms.uRimColor = u.color; shader.uniforms.uRimStr = u.str;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uRimColor; uniform float uRimStr;')
+      .replace('#include <opaque_fragment>', `#include <opaque_fragment>
+        {
+          vec3 vdir = normalize(vViewPosition);
+          float fr = 1.0 - clamp(abs(dot(normalize(normal), vdir)), 0.0, 1.0);
+          gl_FragColor.rgb += uRimColor * pow(fr, 2.6) * uRimStr;
+        }`);
+  };
+  psxify(material);
+  material.customProgramCacheKey = () => 'psxrim' + kind + (material.map ? 1 : 0);
   return material;
 }
 
@@ -98,6 +127,7 @@ uniform vec2 uRes; uniform float uNear; uniform float uFar; uniform float uTime;
 uniform vec3 uRamp0; uniform vec3 uRamp1; uniform vec3 uRamp2; uniform vec3 uRamp3; uniform vec3 uInk;
 uniform float uGrade; uniform float uDither; uniform float uOutline; uniform float uScan;
 uniform float uFlash; uniform vec3 uFlashColor; uniform float uDesat; uniform float uVignette; uniform float uAberr; uniform float uHurt;
+uniform sampler2D tBloom; uniform float uBloom; uniform vec3 uTint; uniform float uLift;
 
 float linDepth(vec2 uv){
   float z = texture2D(tDepth, uv).x;
@@ -150,7 +180,14 @@ void main(){
   vec3 graded = ramp(clamp(l * 1.08, 0.0, 1.0));
   float keep = smoothstep(0.45, 0.9, sat) * smoothstep(0.25, 0.7, mx);
   c = mix(c, graded, uGrade * (1.0 - keep * 0.75));
-  c = mix(c, vec3(l), uDesat);
+  // bloom: fire, magic and lanterns bleed light like an old CRT
+  if (uBloom > 0.0) {
+    vec3 b = texture2D(tBloom, vUv).rgb;
+    c += b * uBloom;
+  }
+  // per-depth colour wash + shadow lift so dark scenes stay readable
+  c = c * uTint + uLift * (1.0 - c);
+  c = mix(c, vec3(dot(c, vec3(0.299, 0.587, 0.114))), uDesat);
 
   // ash grain
   c += (hash(px + floor(uTime * 12.0)) - 0.5) * 0.035;
@@ -192,9 +229,41 @@ export class PSXRenderer {
         uRamp2: { value: new THREE.Color() }, uRamp3: { value: new THREE.Color() }, uInk: { value: new THREE.Color() },
         uGrade: { value: 0.5 }, uDither: { value: 1 }, uOutline: { value: 1 }, uScan: { value: 0 },
         uFlash: { value: 0 }, uFlashColor: { value: new THREE.Color(1, 0, 0) }, uDesat: { value: 0 }, uVignette: { value: 1.4 }, uAberr: { value: 0 }, uHurt: { value: 0 },
+        tBloom: { value: null }, uBloom: { value: 1 }, uTint: { value: new THREE.Color(1, 1, 1) }, uLift: { value: 0.02 },
       },
     });
     this.postScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.post));
+    // bloom: bright pass at half res, then a separable blur ping-pong
+    this.bright = new THREE.ShaderMaterial({
+      vertexShader: POST_VS, depthTest: false, depthWrite: false,
+      uniforms: { tColor: { value: null }, uThresh: { value: 0.68 }, uTexel: { value: new THREE.Vector2() } },
+      fragmentShader: `precision highp float; varying vec2 vUv; uniform sampler2D tColor; uniform float uThresh; uniform vec2 uTexel;
+        vec3 pick(vec2 uv){
+          vec3 c = texture2D(tColor, uv).rgb;
+          float mx = max(c.r, max(c.g, c.b)); float mn = min(c.r, min(c.g, c.b));
+          float sat = mx > 0.0 ? (mx - mn) / mx : 0.0;
+          // hot, saturated light blooms more than pale stone
+          float k = smoothstep(uThresh, 1.0, mx) * (0.45 + 0.75 * sat);
+          return c * k;
+        }
+        void main(){
+          vec3 c = pick(vUv + uTexel * vec2(-0.5, -0.5)) + pick(vUv + uTexel * vec2(0.5, -0.5)) + pick(vUv + uTexel * vec2(-0.5, 0.5)) + pick(vUv + uTexel * vec2(0.5, 0.5));
+          gl_FragColor = vec4(c * 0.25, 1.0);
+        }`,
+    });
+    this.blur = new THREE.ShaderMaterial({
+      vertexShader: POST_VS, depthTest: false, depthWrite: false,
+      uniforms: { tColor: { value: null }, uDir: { value: new THREE.Vector2() } },
+      fragmentShader: `precision highp float; varying vec2 vUv; uniform sampler2D tColor; uniform vec2 uDir;
+        void main(){
+          vec3 c = texture2D(tColor, vUv).rgb * 0.227;
+          c += (texture2D(tColor, vUv + uDir * 1.385).rgb + texture2D(tColor, vUv - uDir * 1.385).rgb) * 0.316;
+          c += (texture2D(tColor, vUv + uDir * 3.23).rgb + texture2D(tColor, vUv - uDir * 3.23).rgb) * 0.070;
+          gl_FragColor = vec4(c, 1.0);
+        }`,
+    });
+    this.fsQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.bright);
+    this.fsScene = new THREE.Scene(); this.fsScene.add(this.fsQuad);
     this.setPalette(PALETTES.crypt);
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -221,6 +290,13 @@ export class PSXRenderer {
     this.rt = new THREE.WebGLRenderTarget(lw, lh, {
       minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, depthTexture: depth, colorSpace: THREE.SRGBColorSpace,
     });
+    for (const b of this.bloomRT || []) b.dispose();
+    const bw = Math.max(8, Math.round(lw / 2)), bh = Math.max(8, Math.round(lh / 2));
+    const bopt = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, type: THREE.HalfFloatType, depthBuffer: false };
+    this.bloomRT = [new THREE.WebGLRenderTarget(bw, bh, bopt), new THREE.WebGLRenderTarget(bw, bh, bopt)];
+    this.bloomTexel = new THREE.Vector2(1 / bw, 1 / bh);
+    this.bright.uniforms.uTexel.value.set(1 / lw, 1 / lh);
+    this.post.uniforms.tBloom.value = this.bloomRT[0].texture;
     this.post.uniforms.tColor.value = this.rt.texture;
     this.post.uniforms.tDepth.value = depth;
     this.post.uniforms.uRes.value.set(lw, lh);
@@ -243,6 +319,20 @@ export class PSXRenderer {
     u.uGrade.value = 0.36 * settings.grade;
     this.renderer.setRenderTarget(this.rt);
     this.renderer.render(scene, camera);
+    if (settings.bloom !== false) {
+      const [a, b] = this.bloomRT;
+      this.fsQuad.material = this.bright; this.bright.uniforms.tColor.value = this.rt.texture;
+      this.renderer.setRenderTarget(a); this.renderer.render(this.fsScene, this.postCam);
+      this.fsQuad.material = this.blur;
+      for (let pass = 0; pass < 2; pass++) {
+        const sp = 1 + pass;
+        this.blur.uniforms.tColor.value = a.texture; this.blur.uniforms.uDir.value.set(this.bloomTexel.x * sp, 0);
+        this.renderer.setRenderTarget(b); this.renderer.render(this.fsScene, this.postCam);
+        this.blur.uniforms.tColor.value = b.texture; this.blur.uniforms.uDir.value.set(0, this.bloomTexel.y * sp);
+        this.renderer.setRenderTarget(a); this.renderer.render(this.fsScene, this.postCam);
+      }
+      u.uBloom.value = this.bloomStrength ?? 1;
+    } else u.uBloom.value = 0;
     this.renderer.setRenderTarget(null);
     this.renderer.render(this.postScene, this.postCam);
   }
@@ -252,8 +342,8 @@ export class PSXRenderer {
 // art direction: each depth of the dungeon gets its own woodcut-print palette.
 export const PALETTES = {
   title: ['#0b0a12', '#3a2f3d', '#b49a7c', '#f3e3c3', '#060508'],
-  crypt: ['#0a0b12', '#3d4b57', '#b3b5a6', '#f4ecd6', '#04050a'],
+  crypt: ['#0b0d15', '#43525f', '#b8bcab', '#f6efda', '#04050a'],
   ossuary: ['#110906', '#5a3626', '#c49c72', '#f8e4bc', '#080303'],
-  abyss: ['#0d0815', '#4a2a55', '#c87a48', '#ffdd94', '#050208'],
+  abyss: ['#120a1a', '#5a3466', '#d08a56', '#ffe2a0', '#050208'],
   shrine: ['#0a0805', '#3d2e1c', '#c79a5b', '#fff0c8', '#060402'],
 };

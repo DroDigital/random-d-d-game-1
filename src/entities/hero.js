@@ -113,7 +113,7 @@ export class Hero extends Actor {
 
   async spawnModel(lib) {
     const c = this.cls;
-    this.model = await lib.instance({ path: 'heroes/' + c.model + '.glb', rig: 'Rig_Medium', height: 2.55, gear: c.gear, skin: this.skin ? { base: c.skinBase, name: this.skin } : null });
+    this.model = await lib.instance({ path: 'heroes/' + c.model + '.glb', rig: 'Rig_Medium', rim: 'hero', height: 2.55, gear: c.gear, skin: this.skin ? { base: c.skinBase, name: this.skin } : null });
     this.model.loop('Idle_A');
     this.game.scene.add(this.model.root);
     this.shadow = this.game.fx.blobShadow(1.8);
@@ -425,6 +425,13 @@ export class Hero extends Actor {
         const t = 1 - Math.max(0, this.stateT) / this.dodgeDur;
         const sp = this.dodgeSpeed * (1 - t * 0.7);
         this.move(Math.cos(this.dodgeDir) * sp * dt, Math.sin(this.dodgeDir) * sp * dt);
+        // speed trail in the hero's colour
+        this.trailT = (this.trailT || 0) - dt;
+        if (this.trailT <= 0) {
+          this.trailT = 0.025;
+          g.fx.spawn('smoke_03', { x: this.pos.x, y: 1.15, z: this.pos.z, life: 0.3, size: 1.9, grow: -1.1, color: this.color, opacity: 0.9 });
+          g.fx.spawn('spark_04', { x: this.pos.x + frand(-0.3, 0.3), y: frand(0.6, 1.8), z: this.pos.z + frand(-0.3, 0.3), life: 0.3, size: 0.25, color: 0xffffff, opacity: 0.8 });
+        }
         if (this.stateT <= 0) { this.state = 'free'; if (this.queued === 'attack') { this.queued = null; this.startAttack(false); } }
         if (c && c.pressed('attack')) this.queued = 'attack';
         break;

@@ -205,4 +205,5 @@ export default {
   "UI scale": "界面缩放",
   "Use your skills": "使用你的技能",
   "Walk into a door to choose your path": "走进一扇门来选择道路",
+  "Bloom": "泛光",
 };

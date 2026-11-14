@@ -80,7 +80,7 @@ export class Actor {
     if (!this.model) return;
     const d = this.angleDiff(this.facing, this.visualFacing);
     this.visualFacing += d * Math.min(1, dt * 18);
-    this.model.root.position.set(this.pos.x, this.pos.y + this.hover, this.pos.z);
+    this.model.root.position.set(this.pos.x, this.pos.y + this.hover - (this.sinkIn || 0), this.pos.z);
     this.model.root.rotation.y = Math.PI / 2 - this.visualFacing;
     // squash & stretch pop when hit (holds during hitstop, which sells the impact)
     if (this.pop > 0) {

@@ -217,6 +217,7 @@ export function buildRoom(room, kit, depthDef) {
   const floors = depthDef.floorAlt;
   const spikeSet = new Set(room.spikes.map((s) => s.i + ',' + s.j));
   const wallEdges = [];
+  room.occluders = [];
 
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
     if (room.get(i, j) === VOID) continue;
@@ -262,7 +263,13 @@ export function buildRoom(room, kit, depthDef) {
     let name = b.prop;
     if (name === 'rubble') name = RNG.getUniform() < 0.5 ? 'rubble_large' : 'rocks_decorated';
     if (name === 'prop') name = depthDef.props[RNG.getUniformInt(0, depthDef.props.length - 1)];
-    kit.place(name, p.x, 0, p.z, RNG.getUniformInt(0, 3) * Math.PI / 2, name.startsWith('pillar') || name === 'column' ? 1 : 1.25);
+    const rot = RNG.getUniformInt(0, 3) * Math.PI / 2, sc = name.startsWith('pillar') || name === 'column' ? 1 : 1.25;
+    if (name.startsWith('rubble') || name.startsWith('rocks')) { kit.place(name, p.x, 0, p.z, rot, sc); continue; }
+    // tall pieces are standalone so they can fade out when they hide a hero
+    const o = kit.cloneFadable(name);
+    o.position.set(p.x, 0, p.z); o.rotation.y = rot; o.scale.setScalar(sc);
+    group.add(o);
+    room.occluders.push({ obj: o, x: p.x, z: p.z, mats: o.userData.mats, a: 1 });
   }
 
   // decorations against north / side walls: banners, torches, candles

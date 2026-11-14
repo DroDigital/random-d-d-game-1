@@ -205,4 +205,5 @@ export default {
   "UI scale": "Escala de la interfaz",
   "Use your skills": "Usa tus habilidades",
   "Walk into a door to choose your path": "Cruza una puerta para elegir tu camino",
+  "Bloom": "Resplandor",
 };

@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { PSXRenderer, PALETTES, settings as psxSettings } from './render/psx.js';
 import { FX } from './render/fx.js';
+import { Atmos } from './render/atmos.js';
 import { ModelLib } from './render/models.js';
 import { Kit } from './world/kit.js';
 import { generateRoom, buildRoom, CELL, SIDE } from './world/room.js';
@@ -19,7 +20,7 @@ import { audio } from './core/audio.js';
 import { input } from './core/input.js';
 import { meta } from './core/meta.js';
 import { loadGLTF, url } from './core/assets.js';
-import { retroify } from './render/psx.js';
+import { retroify, rimUniforms } from './render/psx.js';
 import { t, canvasFont } from './i18n/index.js';
 import { PACTS } from './data/boons.js';
 
@@ -60,6 +61,7 @@ export class Game {
     this.scene.background = new THREE.Color(0x000000);
     progress(0.05, 'Loading effects');
     await this.fx.load();
+    this.atmos = new Atmos(this);
     progress(0.15, 'Loading dungeon kit');
     await this.kit.load((p) => progress(0.15 + p * 0.25, 'Loading dungeon kit'));
     progress(0.4, 'Loading animation rigs');
@@ -133,14 +135,25 @@ export class Game {
     this.enemies = []; this.projectiles = []; this.zones = []; this.pickups = []; this.breakables = []; this.interactables = []; this.doors = []; this.extra = [];
     this.fx.clear();
     this.fx.clearLights();
+    this.atmos && this.atmos.clear();
+    this.shrineFire = null;
     this.ui && this.ui.clearTips();
-    for (const h of this.heroes) if (h.model) { h.lantern = this.fx.persistentLight({ x: h.pos.x, y: 3.2, z: h.pos.z, color: 0xffc890, intensity: 26, distance: 18, flicker: 0.2 }); if (h.lantern) { h.lantern.userData.owner = h; h.lantern.userData.ownerY = 3.4; } }
+    this.ui && this.ui.bossBar(null);
+    for (const h of this.heroes) if (h.model) { h.lantern = this.fx.persistentLight({ x: h.pos.x, y: 3.2, z: h.pos.z, color: 0xffc890, intensity: (this.run && this.run.depth.look && this.run.depth.look.lantern) || 26, distance: 18, flicker: 0.2 }); if (h.lantern) { h.lantern.userData.owner = h; h.lantern.userData.ownerY = 3.4; } }
   }
 
   applyDepthLook(depth, paletteKey = null) {
     this.psx.setPalette(PALETTES[paletteKey || depth.palette]);
     this.scene.fog.color.set(depth.fog);
     this.ambient.color.set(depth.ambient);
+    const L = depth.look || {};
+    this.ambient.intensity = L.ambientI ?? 3;
+    this.hemi.color.set(L.hemiSky ?? 0x9aa8c8); this.hemi.groundColor.set(L.hemiGround ?? 0x302018); this.hemi.intensity = L.hemiI ?? 1.3;
+    this.dirLight.color.set(L.dir ?? 0xc0b0ff); this.dirLight.intensity = L.dirI ?? 1.1;
+    rimUniforms.foe.color.value.set(L.rim ?? 0x8fb4ff);
+    const u = this.psx.post.uniforms;
+    u.uTint.value.setRGB(...(L.tint || [1, 1, 1])); u.uLift.value = L.lift ?? 0.02;
+    this.psx.bloomStrength = L.bloom ?? 1;
   }
 
   async buildTitleScene() {
@@ -153,14 +166,15 @@ export class Game {
     this.room = room;
     this.roomGroup = buildRoom(room, this.kit, depth);
     this.scene.add(this.roomGroup);
+    this.atmos.build(room, depth, { calm: true });
     this.addTorchLights(room, depth);
     this.addShrine(0, 0, true);
     this.titleHeroes = [];
     const lineup = ['fighter', 'rogue', 'wizard', 'druid'];
     for (let k = 0; k < 4; k++) {
       const c = CLASSES[lineup[k]];
-      const m = await this.models.instance({ path: 'heroes/' + c.model + '.glb', rig: 'Rig_Medium', height: 2.55, gear: c.gear });
-      const a = -Math.PI / 2 + (k - 1.5) * 0.55 + Math.PI;
+      const m = await this.models.instance({ path: 'heroes/' + c.model + '.glb', rig: 'Rig_Medium', rim: 'hero', height: 2.55, gear: c.gear });
+      const a = -Math.PI / 2 + (k - 1.5) * 0.62; // far side of the fire, facing the camera
       m.root.position.set(Math.cos(a) * 4.2, 0, Math.sin(a) * 4.2 + 0.5);
       m.root.rotation.y = Math.PI / 2 - Math.atan2(-m.root.position.z, -m.root.position.x);
       m.loop(k % 2 ? 'Idle_B' : 'Idle_A');
@@ -176,6 +190,7 @@ export class Game {
       flame.position.set(t.x + t.nx * 0.35, 3.25, t.z + t.nz * 0.35); flame.scale.set(0.9, 1.3, 1);
       flame.userData.flicker = Math.random() * 10;
       this.scene.add(flame); this.extra.push(flame);
+      this.atmos.addHalo(flame.position.x, 3.25, flame.position.z, depth.torch);
       if (n < 5 && (n === 0 || Math.random() < 0.8)) {
         this.fx.persistentLight({ x: t.x + t.nx * 1.2, y: 3.4, z: t.z + t.nz * 1.2, color: depth.torch, intensity: 22, distance: 16, flicker: 0.5 });
         n++;
@@ -244,6 +259,7 @@ export class Game {
     this.roomType = type;
     this.roomGroup = buildRoom(room, this.kit, depth);
     this.scene.add(this.roomGroup);
+    this.atmos.build(room, depth, { calm: room.kind !== 'combat' && room.kind !== 'boss' });
     this.addTorchLights(room, depth);
     this.buildDoors();
     // heroes at the entrance
@@ -358,7 +374,7 @@ export class Game {
     audio.music('peddler');
     this.setCleared(true);
     const x = 0, z = -3;
-    this.models.instance({ path: 'heroes/Mage.glb', rig: 'Rig_Medium', height: 2.6, gear: { r: 'staff' }, skin: { base: 'mage', name: 'alt_C' } }).then((m) => {
+    this.models.instance({ path: 'heroes/Mage.glb', rig: 'Rig_Medium', rim: 'hero', height: 2.6, gear: { r: 'staff' }, skin: { base: 'mage', name: 'alt_C' } }).then((m) => {
       m.root.position.set(x, 0, z); m.loop('Idle_B'); this.scene.add(m.root); this.extra.push(m.root); this.peddlerModel = m;
     });
     for (const [px, pz, n] of [[-2.4, -3.5, 'chest_large_gold'], [2.4, -3.5, 'barrel_small_stack'], [-3.5, -1.5, 'coin_stack_large']]) { const c = this.kit.clone(n); c.position.set(px, 0, pz); this.scene.add(c); this.extra.push(c); }
@@ -689,9 +705,10 @@ export class Game {
 
     if (this.mode === 'title' || this.mode === 'select') {
       this.titleHeroes && this.titleHeroes.forEach((m) => m.update(dt));
-      const a = this.time * 0.07;
-      this.camera.position.set(Math.sin(a) * 15, 9.5, Math.cos(a) * 15 + 2);
-      this.camera.lookAt(0, 1.6, 0);
+      // slow pendulum sway in front of the gathered party
+      const a = Math.sin(this.time * 0.06) * 0.5;
+      this.camera.position.set(Math.sin(a) * 14.5, 7.2 + Math.sin(this.time * 0.11) * 0.4, Math.cos(a) * 14.5 + 1);
+      this.camera.lookAt(Math.sin(a) * -1.5, 1.7, -1.2);
       this.updateShrineFire(dt);
       this.fx.update(dt, this.camera);
       return;
@@ -744,6 +761,7 @@ export class Game {
     if (this.boss) this.ui.bossBar(this.boss);
 
     this.updateCamera(dt);
+    this.updateOccluders();
     this.fx.update(dt, this.camera);
     this.ui.updateHud(dt);
     for (const l of this.logLines) l.t -= dt;
@@ -820,14 +838,13 @@ export class Game {
   }
 
   updateShrineFire(dt) {
+    this.atmos.update(dt);
+    for (const o of this.extra) if (o.isSprite && o.userData.flicker !== undefined) { o.userData.flicker += dt * 12; o.scale.y = 1.2 + Math.sin(o.userData.flicker) * 0.15 + Math.sin(o.userData.flicker * 2.7) * 0.08; o.scale.x = 0.9 + Math.sin(o.userData.flicker * 1.9) * 0.07; }
     const f = this.shrineFire;
     if (!f) return;
     f.t += dt;
     if (Math.random() < 0.8) this.fx.spawn(Math.random() < 0.5 ? 'flame_03' : 'flame_05', { x: f.x + frand(-0.4, 0.4), y: 0.5, z: f.z + frand(-0.4, 0.4), vy: frand(2, 4), life: frand(0.4, 0.8), size: frand(0.8, 1.6), grow: -0.6, color: 0xff9a40 });
     if (Math.random() < 0.15) this.fx.spawn('spark_06', { x: f.x + frand(-0.5, 0.5), y: 1, z: f.z + frand(-0.5, 0.5), vy: frand(3, 5), vx: frand(-1, 1), life: 1.2, size: 0.3, color: 0xffd080 });
-    // drifting ash motes everywhere (atmosphere)
-    if (Math.random() < 0.3) this.fx.spawn('spark_04', { x: this.camTarget.x + frand(-18, 18), y: frand(4, 9), z: this.camTarget.z + frand(-12, 12), vy: -0.6, vx: frand(-0.3, 0.3), life: 4, size: 0.18, color: 0xd8c0a0, fade: true, opacity: 0.6, additive: false });
-    for (const o of this.extra) if (o.isSprite && o.userData.flicker !== undefined) { o.userData.flicker += dt * 12; o.scale.y = 1.2 + Math.sin(o.userData.flicker) * 0.15; }
   }
 
   updateInteractPrompts() {
@@ -860,6 +877,27 @@ export class Game {
     }
     this.ui.worldTips(this.mode === 'play' && !this.paused ? tips : [], this.camera);
     this.ui.prompts([]);
+  }
+
+  // pillars / tall props between the camera (south, above) and a hero fade out
+  updateOccluders() {
+    const occ = this.room && this.room.occluders;
+    if (!occ || !occ.length) return;
+    const k = Math.min(1, (this.realDt || 0.016) * 10);
+    for (const o of occ) {
+      let hide = false;
+      for (const h of this.heroes) {
+        if (!h.model) continue;
+        const dz = o.z - h.pos.z, dx = Math.abs(o.x - h.pos.x);
+        if (dz > -0.6 && dz < 7.5 && dx < 2.4 + dz * 0.12) { hide = true; break; }
+      }
+      const target = hide ? 0.28 : 1;
+      if (Math.abs(o.a - target) < 0.005) continue;
+      o.a += (target - o.a) * k;
+      if (Math.abs(o.a - target) < 0.01) o.a = target;
+      const fading = o.a < 0.99;
+      for (const m of o.mats) { m.opacity = o.a; if (m.transparent !== fading) { m.transparent = fading; m.needsUpdate = true; } m.depthWrite = !fading; }
+    }
   }
 
   updateCamera(dt) {

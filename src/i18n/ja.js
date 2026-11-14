@@ -205,4 +205,5 @@ export default {
   "UI scale": "UIサイズ",
   "Use your skills": "スキルを使おう",
   "Walk into a door to choose your path": "扉に入って道を選ぼう",
+  "Bloom": "ブルーム",
 };

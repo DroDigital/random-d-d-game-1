@@ -68,7 +68,15 @@ export class Enemy extends Actor {
     this.syncModel(0);
     if (this.state === 'spawn' && !isProp) {
       if (this.anims.spawn && this.model.has(this.anims.spawn)) this.model.once(this.anims.spawn, { duration: 1.0 });
-      this.game.fx.burst('smoke_07', this.pos.x, 0.5, this.pos.z, 8, { color: 0x403a48, speed: 2, up: 1.5, additive: false, size: 1.4 });
+      const fx = this.game.fx, x = this.pos.x, z = this.pos.z;
+      fx.burst('smoke_07', x, 0.5, z, 8, { color: 0x403a48, speed: 2, up: 1.5, additive: false, size: 1.4 });
+      // summoning sigil: the foe claws up out of a glowing circle
+      const col = this.elite ? 0xffb347 : 0xc04aff;
+      fx.decal('symbol_01', { x, z, size: this.elite ? 4.2 : 3.2, color: col, life: 1.2, opacity: 0.9, fadeIn: 0.15, grow: 0.25, rot: Math.random() * 6 });
+      fx.decal('circle_05', { x, z, size: 3, color: col, life: 0.6, opacity: 0.6, grow: 0.8 });
+      fx.burst('spark_06', x, 0.3, z, 10, { color: col, speed: 1.5, up: 6, size: 0.3, life: 0.7 });
+      fx.light({ x, y: 1.2, z, color: col, intensity: 18, distance: 9, life: 0.6 });
+      if (!this.flying) this.sinkIn = this.height * 0.9;
     }
   }
 
@@ -90,10 +98,10 @@ export class Enemy extends Actor {
     this.pop = Math.min(1, Math.max(this.pop || 0, (this.isBoss ? 0.25 : 0.5) + rel * 2 + (heavy || crit ? 0.3 : 0)));
     this.lastHitAngle = angle; this.lastHitHeavy = heavy || crit;
     if (!this.isBoss && this.hp > 0 && (rel > 0.08 || heavy || crit) && ['chase', 'recover', 'spawn'].includes(this.state)) {
-      if (this.model.has && this.model.has(this.anims.hit)) this.model.once(this.anims.hit, { duration: heavy || crit ? 0.4 : 0.26 });
+      if (this.model && this.model.has(this.anims.hit)) this.model.once(this.anims.hit, { duration: heavy || crit ? 0.4 : 0.26 });
       this.state = 'recover'; this.stateT = Math.max(this.stateT, this.elite ? 0.12 : heavy || crit ? 0.38 : 0.2);
     }
-    this.model.hitFlash(crit ? 0xffd23f : 0xffffff);
+    this.model?.hitFlash(crit ? 0xffd23f : 0xffffff);
     this.game.fx.blood(this.pos.x, this.pos.z, this.tags.includes('undead') ? 0xd8d0c0 : this.tags.includes('ooze') || this.tags.includes('plant') ? 0x88c040 : 0x8a1020, crit ? 14 : 6);
     if (this.tags.includes('undead')) audio.play('bone', { vol: 0.35 });
     if (source && source.isHero && this.affixes.includes('thorned') && source.distTo(this) < 4) applyDamage(this.game, this, source, [{ amount: rollDice('1d6'), type: 'piercing' }]);
@@ -111,7 +119,7 @@ export class Enemy extends Actor {
   stagger(t) {
     this.cancelAttack();
     this.state = 'stagger'; this.stateT = t; this.addCond('stagger', t);
-    this.model.once(this.anims.hit, { duration: Math.min(t, 0.6) });
+    this.model?.once(this.anims.hit, { duration: Math.min(t, 0.6) });
     this.game.fx.text('STAGGERED', this.pos.x, this.height + 1.2, this.pos.z, { color: '#ffb347', big: true });
     audio.play('hitHeavy', { vol: 0.6 });
   }
@@ -130,7 +138,7 @@ export class Enemy extends Actor {
       this.fling = { vx: Math.cos(a) * f, vz: Math.sin(a) * f, vy: this.lastHitHeavy ? 7 : 4.5, y: 0, spin: frand(-1, 1) * 4 };
     }
     this.sink = 0;
-    if (this.model.has && this.model.has(this.anims.death)) this.model.once(this.anims.death, { hold: true, duration: 1.0 });
+    if (this.model && this.model.has(this.anims.death)) this.model.once(this.anims.death, { hold: true, duration: 1.0 });
     this.game.onEnemyDeath(this, source);
     audio.play(this.tags.includes('undead') ? 'bone' : 'hitHeavy', { vol: 0.6 });
     if (this.def.split && !this.thrall) for (let i = 0; i < 2; i++) this.game.spawnEnemy(this.def.split, this.pos.x + frand(-1, 1), this.pos.z + frand(-1, 1), { noSpawnAnim: true });
@@ -206,6 +214,7 @@ export class Enemy extends Actor {
     const t = this.target;
 
     this.stateT -= dt; this.cd -= dt * (frozen ? 0 : 1);
+    if (this.sinkIn) this.sinkIn = Math.max(0, this.sinkIn - dt * this.height * 2.2);
     switch (this.state) {
       case 'spawn': if (this.stateT <= 0) this.state = 'chase'; break;
       case 'disguised': {

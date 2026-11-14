@@ -80,6 +80,15 @@ export class Kit {
     return group;
   }
 
+  // a clone with its own materials, so it can fade when it hides a hero
+  cloneFadable(name, textureKey) {
+    const g = this.clone(name, textureKey);
+    const mats = [];
+    g.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); o.material.userData.psx = false; psxify(o.material); mats.push(o.material); } });
+    g.userData.mats = mats;
+    return g;
+  }
+
   // a standalone (non-instanced) clone, e.g. chests, breakables, doors
   clone(name, textureKey) {
     const p = this.pieces[name];
