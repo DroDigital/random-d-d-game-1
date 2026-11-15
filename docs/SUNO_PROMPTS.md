@@ -1,4 +1,4 @@
-# Suno prompts for every piece of music in Ashen Oath
+# Suno prompts for every piece of music in Oathguard
 
 The game currently uses CC0 placeholder music (Ninja Adventure, Kenney). These
 prompts are for generating a cohesive replacement soundtrack in Suno.

@@ -7,6 +7,9 @@ import { input } from './core/input.js';
 import { meta } from './core/meta.js';
 import { settings as psxSettings } from './render/psx.js';
 import { setLang, detectLang } from './i18n/index.js';
+import { draftBoons } from './world/run.js';
+import { loadGLTF } from './core/assets.js';
+import { Box3 } from 'three';
 
 const bootFill = document.getElementById('boot-fill');
 const bootNote = document.getElementById('boot-note');
@@ -74,6 +77,8 @@ async function main() {
   requestAnimationFrame(frame);
   window.__game = game;
   window.__psx = psxSettings;
+  window.__draft = draftBoons; // test hooks (balance sims, asset checks)
+  window.__loadGLTF = loadGLTF; window.__Box3 = Box3;
 }
 
 main().catch((e) => {

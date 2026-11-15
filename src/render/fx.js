@@ -23,6 +23,7 @@ export class FX {
     await Promise.all(FX_TEX.map(async (n) => { this.tex[n] = await loadTexture('assets/fx/' + n + '.png', { pixel: false }); }));
     await Promise.all(CRAWL_FX.map(async (n) => { this.tex[n] = await loadTexture('assets/sprites/crawl/' + n + '.png'); }));
     this.tex.lightmask = await loadTexture('assets/fx/lightmask.png', { pixel: false });
+    this.tex.explosion = await loadTexture('assets/fx/explosion_strip.png', { pixel: false });
     this.diceModels = {};
     for (const c of ['red', 'blue', 'green', 'yellow']) {
       const g = await loadGLTF('assets/models/dice/D20_' + c + '.gltf');

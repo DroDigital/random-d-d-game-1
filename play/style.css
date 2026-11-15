@@ -221,3 +221,6 @@ html.cjk .menu-title, html.cjk .banner-text, html.cjk .title-logo .t2 { letter-s
 .title-screen { position: relative; }
 .title-screen .title-menu { position: absolute; left: max(4vw, 24px); top: 30vh; min-width: 300px; background: linear-gradient(90deg, rgba(6,5,8,0.82), rgba(6,5,8,0.55)); text-align: left; }
 .title-screen .title-menu .menu-item { text-align: left; }
+
+/* boss poise bar while it cannot be staggered again (drains back to zero) */
+.bossbar .poise.locked { background: #6a6672 !important; opacity: 0.7; }

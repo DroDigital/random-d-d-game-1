@@ -108,10 +108,11 @@ export class Enemy extends Actor {
     if (angle !== null && knock && !this.isBoss) { const k = knock * (this.elite ? 0.5 : 1); this.knock.x += Math.cos(angle) * k; this.knock.z += Math.sin(angle) * k; }
     if (source && source.isHero) { this.target = source; this.retarget = 2; this.lastHitBy = source; }
     // poise / stagger
-    this.poise += poise; this.poiseRegenT = 3;
+    if (!(this.poiseLock > 0)) { this.poise += poise; this.poiseRegenT = 3; }
     if (this.poise >= this.poiseMax && this.state !== 'stagger' && this.hp > 0) {
       this.poise = 0;
-      this.stagger(this.isBoss ? 2.2 : 1.3);
+      this.stagger(this.isBoss ? 1.6 : 1.3);
+      if (this.isBoss) this.poiseLock = 8; // no stun-locking bosses
     }
     if (this.hp <= 0) this.die(source);
   }
@@ -207,7 +208,7 @@ export class Enemy extends Actor {
     if (this.affixes.includes('ember')) { this.emberT = (this.emberT || 0) - dt; if (this.emberT <= 0) { this.emberT = 1.2; g.spawnZone({ kind: 'fire', owner: this, x: this.pos.x, z: this.pos.z, radius: 1.4, life: 4 }); } }
 
     const frozen = this.has('frozen') || this.has('prone');
-    let speedMul = (this.has('slowed') ? 0.25 : 1) * (this.has('chilled') ? 0.6 : 1) * (frozen ? 0 : 1);
+    let speedMul = (this.has('slowed') ? 0.25 : 1) * (this.has('chilled') ? 0.6 : 1) * (this.has('webbed') ? 0.5 : 1) * (frozen ? 0 : 1);
 
     this.retarget -= dt;
     if (!this.target || !this.target.alive || (this.target.isHero && !this.target.canAct) || this.retarget <= 0) { this.target = this.pickTarget(); this.retarget = 1.5; }

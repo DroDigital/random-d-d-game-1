@@ -83,14 +83,14 @@ export const ENEMIES = {
 
 export const BOSSES = {
   necromancer: { name: 'Morvayne', title: 'the Hollow Bishop', model: 'skeletons/Necromancer.glb', anim: 'skeleton', height: 3.8, gear: { r: 'Skeleton_Staff' },
-    portrait: 'assets/sprites/crawl/mon_necromancer.png', cr: 5, ac: 15, hp: 150, atk: 7, dmg: '2d8+3', type: 'necrotic', speed: 3.0, poise: 70, dc: 14,
+    portrait: 'assets/sprites/crawl/mon_necromancer.png', cr: 5, ac: 15, hp: 480, atk: 7, dmg: '2d8+3', type: 'necrotic', speed: 3.0, poise: 70, dc: 14,
     saves: { con: 3, int: 5, wis: 3 }, resist: ['necrotic'], immune: ['poison'], tags: ['undead'], music: 'boss',
     animOverride: { idle: 'Idle_A', walk: 'Walking_A', attack: 'Ranged_Magic_Shoot', cast: 'Ranged_Magic_Spellcasting', summon: 'Ranged_Magic_Summon', death: 'Death_A' } },
   golem: { name: 'The Ossuary Colossus', title: 'Bones of a Thousand Oaths', model: 'skeletons/Skeleton_Golem.glb', anim: 'large', height: 6.0, gear: { r: 'Skeleton_Golem_Axe_Large' },
-    portrait: 'assets/sprites/crawl/mon_undead_skeletons_skeleton_humanoid_large.png', cr: 8, ac: 17, hp: 260, atk: 8, dmg: '3d10+5', type: 'bludgeoning', speed: 3.2, poise: 120, dc: 15,
+    portrait: 'assets/sprites/crawl/mon_undead_skeletons_skeleton_humanoid_large.png', cr: 8, ac: 17, hp: 1000, atk: 8, dmg: '3d10+5', type: 'bludgeoning', speed: 3.2, poise: 120, dc: 15,
     saves: { str: 6, con: 6 }, vuln: ['bludgeoning'], immune: ['poison'], tags: ['undead'], music: 'boss2' },
   wyrm: { name: 'Cindermaw', title: 'the Ember Wyrm', model: 'monsters/Flying_Dragon_Evolved.gltf', anim: 'flying', height: 7.5, hover: 1.0,
-    portrait: 'assets/sprites/crawl/mon_dragons_shadow_dragon.png', cr: 10, ac: 18, hp: 380, atk: 9, dmg: '2d10+6', type: 'fire', speed: 3.8, poise: 160, dc: 16,
+    portrait: 'assets/sprites/crawl/mon_dragons_shadow_dragon.png', cr: 10, ac: 18, hp: 1500, atk: 9, dmg: '2d10+6', type: 'fire', speed: 3.8, poise: 160, dc: 16,
     saves: { dex: 4, con: 7, wis: 4 }, immune: ['fire'], tags: ['dragon'], music: 'boss3' },
 };
 

@@ -85,6 +85,7 @@ export class Projectile {
     if (g.room.solidAt(this.x, this.z, true)) { this.impactFx(); if (this.kind === 'fireball') this.explode(); else this.kill(); return; }
     const c = g.room.toCell(this.x, this.z);
     if (g.room.blockTall && g.room.blockTall[g.room.idx(c.i, c.j)] && !this.homing) { this.impactFx(); this.kill(); return; }
+    if (g.hazards && g.hazards.projectile(this)) { this.impactFx(); if (this.kind === 'fireball') this.explode(); else this.kill(); return; }
 
     if (this.enemy) {
       for (const h of g.heroes) {
@@ -146,6 +147,7 @@ export class Projectile {
     g.shake(0.6); audio.play('explode', { vol: 0.9 });
     for (const e of g.enemies) if (e.alive && Math.hypot(e.pos.x - this.x, e.pos.z - this.z) < 4.5 + e.radius) heroSaveDamage(g, h, e, { dice: '6d6', type: 'fire', ability: 'dex' });
     this.kill();
+    g.hazards && g.hazards.blast(this.x, this.z, 4.5, h);
   }
 }
 

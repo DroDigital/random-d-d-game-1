@@ -485,6 +485,7 @@ export class Hero extends Actor {
     // movement
     let speed = this.speed * moveMul;
     if (this.has('slowed')) speed *= 0.6;
+    if (this.has('webbed')) speed *= 0.5;
     if (this.exhausted) speed *= 0.8;
     if (this.has('rage')) speed *= 1.05;
     if (this.has('dash')) speed *= 1.6;
@@ -618,7 +619,7 @@ export class Hero extends Actor {
         for (let s = 0; s < swings && e.alive; s++) { const r = heroAttack(g, this, e, { heavy: atk.heavy, noDie: s > 0 }); if (r.hit) hitAny = true; }
       }
       // breakables
-      for (const b of g.breakables) if (!b.broken && Math.hypot(b.x - this.pos.x, b.z - this.pos.z) < reach + 0.8) g.breakProp(b, this);
+      g.hazards.hitArc(this, reach, arc);
       if (hitAny) { audio.play(atk.heavy ? 'hitHeavy' : 'slice', { vol: 0.7 }); g.hitstop(atk.heavy ? 0.07 : 0.035); }
     } else {
       const proj = spec.projectile || a.projectile;
@@ -664,7 +665,7 @@ export class Hero extends Actor {
     }
     if (this.flags.has('scorching_ray') && !isSkill && this.attackCount % 3 === 0 && !this.rayLock) {
       this.rayLock = true;
-      for (let i = 0; i < 3; i++) g.spawnProjectile({ kind: 'ray', owner: this, x: this.pos.x, z: this.pos.z, target, speed: 30, auto: { dice: '2d6', type: 'fire' }, delay: i * 0.08 });
+      for (let i = 0; i < 3; i++) g.spawnProjectile({ kind: 'ray', owner: this, x: this.pos.x, z: this.pos.z, target, speed: 30, auto: { dice: '1d6', type: 'fire' }, delay: i * 0.08 });
       setTimeout(() => { this.rayLock = false; }, 300);
     }
   }

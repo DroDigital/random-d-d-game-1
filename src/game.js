@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { PSXRenderer, PALETTES, settings as psxSettings } from './render/psx.js';
 import { FX } from './render/fx.js';
 import { Atmos } from './render/atmos.js';
+import { Hazards } from './world/hazards.js';
 import { ModelLib } from './render/models.js';
 import { Kit } from './world/kit.js';
 import { generateRoom, buildRoom, CELL, SIDE } from './world/room.js';
@@ -62,6 +63,7 @@ export class Game {
     progress(0.05, 'Loading effects');
     await this.fx.load();
     this.atmos = new Atmos(this);
+    this.hazards = new Hazards(this);
     progress(0.15, 'Loading dungeon kit');
     await this.kit.load((p) => progress(0.15 + p * 0.25, 'Loading dungeon kit'));
     progress(0.4, 'Loading animation rigs');
@@ -136,6 +138,7 @@ export class Game {
     this.fx.clear();
     this.fx.clearLights();
     this.atmos && this.atmos.clear();
+    this.hazards && this.hazards.clear();
     this.shrineFire = null;
     this.ui && this.ui.clearTips();
     this.ui && this.ui.bossBar(null);
@@ -167,6 +170,7 @@ export class Game {
     this.roomGroup = buildRoom(room, this.kit, depth);
     this.scene.add(this.roomGroup);
     this.atmos.build(room, depth, { calm: true });
+    this.hazards.build(room);
     this.addTorchLights(room, depth);
     this.addShrine(0, 0, true);
     this.titleHeroes = [];
@@ -260,6 +264,7 @@ export class Game {
     this.roomGroup = buildRoom(room, this.kit, depth);
     this.scene.add(this.roomGroup);
     this.atmos.build(room, depth, { calm: room.kind !== 'combat' && room.kind !== 'boss' });
+    this.hazards.build(room);
     this.addTorchLights(room, depth);
     this.buildDoors();
     // heroes at the entrance
@@ -283,7 +288,6 @@ export class Game {
     else if (type === 'altar') this.setupAltar();
     else if (type === 'boss') await this.setupBoss();
     else this.setupCombat(type);
-    this.addBreakables();
     // ash remains from a previous wipe
     if (run.remains && run.remains.depthIndex === run.depthIndex && run.remains.roomIndex === run.roomIndex) this.placeRemains();
     room.computeFlow(this.heroes.map((h) => h.pos));
@@ -500,7 +504,7 @@ export class Game {
       const amt = 800 + depth * 600;
       const bp = this.bossPos || { x: 0, z: 0 };
       for (let i = 0; i < 16; i++) this.dropAsh(bp.x + frand(-3, 3), bp.z + frand(-3, 3), Math.round(amt / 16));
-      this.heroes.forEach((h) => this.ui.openDraft(h, draftBoons(h, { depth: depth + 1, minRarity: 'rare', legendaryBoost: 4 })));
+      this.heroes.forEach((h) => this.ui.openDraft(h, draftBoons(h, { depth: depth + 1, minRarity: 'rare', legendaryBoost: 2.5 })));
     }
   }
 
@@ -839,6 +843,7 @@ export class Game {
 
   updateShrineFire(dt) {
     this.atmos.update(dt);
+    this.hazards.update(dt);
     for (const o of this.extra) if (o.isSprite && o.userData.flicker !== undefined) { o.userData.flicker += dt * 12; o.scale.y = 1.2 + Math.sin(o.userData.flicker) * 0.15 + Math.sin(o.userData.flicker * 2.7) * 0.08; o.scale.x = 0.9 + Math.sin(o.userData.flicker * 1.9) * 0.07; }
     const f = this.shrineFire;
     if (!f) return;

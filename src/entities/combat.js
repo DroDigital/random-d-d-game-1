@@ -126,10 +126,12 @@ export function heroAttack(game, hero, target, opts = {}) {
   if (target.marked && target.marked.owner === hero && target.marked.time > 0) parts.push({ amount: rollDice('1d6', { crit: res.crit }), type: 'force' });
   if (hero.cls.id === 'ranger' && hero.level >= 3 && target.hp < target.maxHp && (target.colossusCd || 0) <= 0) { parts.push({ amount: rollDice('1d8', { crit: res.crit }), type: spec.type || a.type }); target.colossusCd = 1; }
   if (hero.cls.id === 'druid' && hero.level >= 7 && spec.kind === 'melee') parts.push({ amount: rollDice('1d8', { crit: res.crit }), type: 'radiant' });
-  if (heavy && hero.flags.has('smite')) parts.push({ amount: rollDice('2d8', { crit: res.crit }), type: 'radiant' });
+  // boon riders and smites only ride the first swing of an Extra Attack
+  const first = !opts.noDie;
+  if (first && heavy && hero.flags.has('smite')) parts.push({ amount: rollDice('2d8', { crit: res.crit }), type: 'radiant' });
   if (hero.flags.has('prey') && target.hp < target.maxHp && (target.preyCd || 0) <= 0) { parts.push({ amount: rollDice('1d8'), type: spec.type || a.type }); target.preyCd = 1; }
   if (hero.flags.has('shatter') && target.has && target.has('frozen')) parts.push({ amount: rollDice('1d10'), type: 'cold' });
-  for (const oh of hero.onHit) {
+  for (const oh of first ? hero.onHit : []) {
     if (oh.only && !(target.tags || []).some((t) => oh.only.includes(t))) continue;
     if (oh.wounded && target.hp >= target.maxHp) continue;
     let amt = rollDice(oh.dice, { crit: res.crit });

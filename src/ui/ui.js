@@ -118,7 +118,7 @@ export class UI {
     audio.music('title');
     this.setScreen('title', () => {
       const w = h('div', 'title-screen');
-      w.appendChild(h('div', 'title-logo', `<div class="t1">ASHEN&nbsp;OATH</div><div class="t2">${t('a couch co-op souls-roguelite of the Fifth Edition')}</div>`));
+      w.appendChild(h('div', 'title-logo', `<div class="t1">OATHGUARD</div><div class="t2">${t('a couch co-op souls-roguelite of the Fifth Edition')}</div>`));
       w.appendChild(this.menu([
         { label: t('Begin the Oath'), action: () => this.showSelect() },
         { label: `${t('Vows')} <small>(${t('{0} sworn', this.game.vowsChosen.size)})</small>`, action: () => this.showVows() },
@@ -216,9 +216,10 @@ export class UI {
       <p>${t('credits.game')}</p>
       <h3>${t('Libraries')}</h3><p>three.js (MIT) · rot.js (BSD-3) · howler.js (MIT) · Fontsource: IM Fell English & VT323 (OFL) · Noto Serif CJK SC/JP (OFL) · Electron (MIT) · esbuild (MIT)</p>
       <h3>${t('Art & audio (all CC0 unless noted)')}</h3>
-      <p>KayKit Adventurers, Skeletons, Character Animations, Dungeon Remastered, Board Game Bits — Kay Lousberg<br>
+      <p>KayKit Adventurers, Skeletons, Character Animations, Dungeon Remastered, Halloween Bits, Board Game Bits — Kay Lousberg<br>
       Ultimate Monsters — Quaternius<br>
-      Particle Pack, Smoke Particles, Light Masks, Fantasy UI Borders, RPG Audio, Impact Sounds, Interface Sounds, Music Loops, Music Jingles, Fighter Voiceover — Kenney<br>
+      Pixel Art Atlas 3D props — CodePawl, from Pixel Art Atlas by Angais<br>
+      Particle Pack, Smoke Particles, Explosion Pack, Light Masks, Fantasy UI Borders, RPG Audio, Impact Sounds, Interface Sounds, Music Loops, Music Jingles, Fighter Voiceover — Kenney<br>
       Ninja Adventure music — Pixel-boy & AAA<br>
       Dungeon Crawl Stone Soup tiles (CC0 release)<br>
       game-icons.net — Lorc, Delapouite, Skoll, Sbed, Felbrigg, Zeromancer, Faithtoken, Carl Olsen and others (CC BY 3.0)<br>
@@ -440,7 +441,9 @@ export class UI {
       this.bossEl = { fill: $('.fill', el), poise: $('.poise', el), info: $('.binfo', el) };
     }
     this.bossEl.fill.style.width = (100 * Math.max(0, boss.hp) / boss.maxHp) + '%';
-    this.bossEl.poise.style.width = (100 * Math.min(1, boss.poise / boss.poiseMax)) + '%';
+    const locked = boss.poiseLock > 0;
+    this.bossEl.poise.style.width = (locked ? 100 * Math.min(1, boss.poiseLock / 8) : 100 * Math.min(1, boss.poise / boss.poiseMax)) + '%';
+    this.bossEl.poise.classList.toggle('locked', locked);
     this.bossEl.info.textContent = `${t('AC {0}', boss.ac)} · CR ${boss.def.cr} · ${t('Phase {0}', boss.phase)}${boss.has('stagger') ? ' · ' + t('STAGGERED') : ''}`;
   }
   bossPhase() { }

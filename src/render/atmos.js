@@ -181,13 +181,13 @@ export class Atmos {
   }
 
   // soft glow + rising sparks around a wall torch flame
-  addHalo(x, y, z, color) {
+  addHalo(x, y, z, color, { size = 3.4, sparks = true, opacity = 0.35 } = {}) {
     const fx = this.game.fx;
-    const mat = new THREE.SpriteMaterial({ map: fx.tex.light_02 || fx.tex.circle_05, color, transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending });
+    const mat = new THREE.SpriteMaterial({ map: fx.tex.light_02 || fx.tex.circle_05, color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending });
     const s = new THREE.Sprite(mat);
-    s.position.set(x, y, z); s.scale.set(3.4, 3.4, 1);
+    s.position.set(x, y, z); s.scale.set(size, size, 1);
     this.group.add(s);
-    this.halos.push({ s, x, y, z, ph: Math.random() * 10, color });
+    this.halos.push({ s, x, y, z, ph: Math.random() * 10, color, sparks, base: opacity });
   }
 
   update(dt) {
@@ -206,7 +206,8 @@ export class Atmos {
     }
     const fx = this.game.fx;
     for (const h of this.halos) {
-      h.s.material.opacity = 0.3 + Math.sin(this.time * 9 + h.ph) * 0.04 + Math.random() * 0.05;
+      if (!h.sparks) { h.s.material.opacity = h.base * (0.85 + Math.sin(this.time * 1.7 + h.ph) * 0.15); continue; }
+      h.s.material.opacity = h.base * (0.86 + Math.sin(this.time * 9 + h.ph) * 0.12) + Math.random() * 0.05;
       if (Math.random() < dt * 1.6) fx.spawn('spark_06', { x: h.x + frand(-0.15, 0.15), y: h.y + 0.3, z: h.z, vy: frand(1.2, 2.4), vx: frand(-0.3, 0.3), life: frand(0.6, 1.1), size: 0.16, color: 0xffb060 });
     }
   }

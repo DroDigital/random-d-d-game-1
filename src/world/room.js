@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { Map as RotMap, RNG } from 'rot-js';
 import { rng } from '../core/rules.js';
+import { dressRoom, wallVariant, DEPTH_THEMES } from './dress.js';
 
 export const CELL = 4;
 export const FLOOR = 0, VOID = 1, BLOCK = 2;
@@ -185,14 +186,27 @@ export function generateRoom({ kind, depth, doors: nDoors }) {
     const ci = midI, cj = Math.floor(h / 2);
     for (const [a, b] of [[-2, -2], [2, -2], [-2, 2], [2, 2], [0, -3], [0, 3], [-3, 0], [3, 0]]) tryBlock(ci + a, cj + b, 'column');
   }
+  // the Ember Abyss: molten pools in every battle, and four in the boss arena
+  if (depth === 2 && (kind === 'combat' || kind === 'boss') && pattern !== 'cellular') {
+    const pools = kind === 'boss' ? [[3, 3], [w - 4, 3], [3, h - 4], [w - 4, h - 4]] : Array.from({ length: rng.int(1, 2) }, () => [rng.int(2, w - 3), rng.int(2, h - 3)]);
+    for (const [ci, cj] of pools) {
+      const cells = [[0, 0], [1, 0], [0, 1], [1, 1], [-1, 0], [0, -1]].slice(0, kind === 'boss' ? 4 : rng.int(2, 5));
+      for (const [a, b] of cells) tryBlock(ci + a, cj + b, 'lava');
+    }
+  }
   room.blockers = blockers;
   room.blockTall = new Uint8Array(w * h);
   for (const b of blockers) if (b.prop === 'pillar' || b.prop === 'pillar_decorated' || b.prop === 'column') room.blockTall[room.idx(b.i, b.j)] = 1;
 
   // spike traps in deeper combat rooms
-  if (kind === 'combat' && depth >= 1 && rng.chance(0.45)) {
+  if (kind === 'boss' && depth === 0) {
+    // the Hollow Bishop's crypt floor is riddled with spike plates
+    const cells = room.floorCells().filter(([i, j]) => !reserved.has(i + ',' + j) && Math.abs(i - midI) + Math.abs(j - Math.floor(h / 2)) > 2);
+    for (let k = 0; k < rng.int(5, 7) && cells.length; k++) { const c = cells.splice(rng.int(0, cells.length - 1), 1)[0]; room.spikes.push({ i: c[0], j: c[1], phase: rng.float() * 3 }); }
+  }
+  if (kind === 'combat' && rng.chance(depth >= 1 ? 0.45 : 0.3)) {
     const cells = room.floorCells().filter(([i, j]) => !reserved.has(i + ',' + j));
-    for (let k = 0; k < rng.int(3, 7) && cells.length; k++) {
+    for (let k = 0; k < (depth >= 1 ? rng.int(3, 7) : rng.int(2, 4)) && cells.length; k++) {
       const c = cells.splice(rng.int(0, cells.length - 1), 1)[0];
       room.spikes.push({ i: c[0], j: c[1], phase: rng.float() * 3 });
     }
@@ -215,15 +229,24 @@ export function buildRoom(room, kit, depthDef) {
   const doorKey = new Set(room.doors.map((d) => d.i + ',' + d.j + ',' + d.side));
   doorKey.add(room.entrance.i + ',' + room.entrance.j + ',S');
   const floors = depthDef.floorAlt;
+  const theme = DEPTH_THEMES[depthDef.id] || {};
   const spikeSet = new Set(room.spikes.map((s) => s.i + ',' + s.j));
   const wallEdges = [];
   room.occluders = [];
+  room.lavaCells = [];
+  room.colliders = [];
 
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
     if (room.get(i, j) === VOID) continue;
     const p = room.toWorld(i, j);
-    const fl = spikeSet.has(i + ',' + j) ? 'floor_tile_big_spikes' : (RNG.getUniform() < 0.6 ? floors[0] : floors[RNG.getUniformInt(1, floors.length - 1)]);
-    kit.place(fl, p.x, 0, p.z, (RNG.getUniformInt(0, 3)) * Math.PI / 2);
+    const fr = RNG.getUniform(), TF = theme.floors || {};
+    if (!spikeSet.has(i + ',' + j) && TF.quad && fr < 0.14) {
+      // a patch of small 2x2 tiles (decorated, broken, weedy) breaks up the grid
+      for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) kit.place(TF.quad[RNG.getUniformInt(0, TF.quad.length - 1)], p.x + ox, 0, p.z + oz, RNG.getUniformInt(0, 3) * Math.PI / 2);
+    } else {
+      const fl = spikeSet.has(i + ',' + j) ? 'floor_tile_big_spikes' : (TF.large && fr < 0.22 ? TF.large[RNG.getUniformInt(0, TF.large.length - 1)] : fr < 0.6 ? floors[0] : floors[RNG.getUniformInt(1, floors.length - 1)]);
+      kit.place(fl, p.x, 0, p.z, (RNG.getUniformInt(0, 3)) * Math.PI / 2);
+    }
     for (const s of ['N', 'S', 'W', 'E']) {
       const sd = SIDE[s];
       if (room.get(i + sd.di, j + sd.dj) !== VOID) continue;
@@ -237,7 +260,8 @@ export function buildRoom(room, kit, depthDef) {
         kit.place('wall_doorway', ex, 0, ez, sd.rot);
       } else {
         const r = RNG.getUniform();
-        const variant = r < 0.62 ? 'wall' : r < 0.74 ? 'wall_cracked' : r < 0.82 ? 'wall_inset_candles' : r < 0.9 ? 'wall_arched' : r < 0.95 ? 'wall_window_closed' : 'wall_broken';
+        const tv = wallVariant(theme, RNG.getUniform());
+        const variant = tv ? tv : r < 0.62 ? 'wall' : r < 0.74 ? 'wall_cracked' : r < 0.82 ? 'wall_inset_candles' : r < 0.9 ? 'wall_arched' : r < 0.95 ? 'wall_window_closed' : 'wall_broken';
         kit.place(variant, ex, 0, ez, sd.rot);
       }
     }
@@ -261,6 +285,7 @@ export function buildRoom(room, kit, depthDef) {
   for (const b of room.blockers) {
     const p = room.toWorld(b.i, b.j);
     let name = b.prop;
+    if (name === 'lava' || (name === 'rubble' && depthDef.id === 'abyss' && RNG.getUniform() < 0.75)) { room.lavaCells.push({ i: b.i, j: b.j, x: p.x, z: p.z }); continue; }
     if (name === 'rubble') name = RNG.getUniform() < 0.5 ? 'rubble_large' : 'rocks_decorated';
     if (name === 'prop') name = depthDef.props[RNG.getUniformInt(0, depthDef.props.length - 1)];
     const rot = RNG.getUniformInt(0, 3) * Math.PI / 2, sc = name.startsWith('pillar') || name === 'column' ? 1 : 1.25;
@@ -272,7 +297,7 @@ export function buildRoom(room, kit, depthDef) {
     room.occluders.push({ obj: o, x: p.x, z: p.z, mats: o.userData.mats, a: 1 });
   }
 
-  // decorations against north / side walls: banners, torches, candles
+  // decorations against north / side walls: torches and banners (the dresser does the rest)
   const torchSpots = [];
   let k = 0;
   for (const e of wallEdges) {
@@ -284,14 +309,13 @@ export function buildRoom(room, kit, depthDef) {
     else if (k % 5 === 2) {
       const b = depthDef.banners[k % depthDef.banners.length];
       kit.place(b, e.x + inX * 0.55, 0.2, e.z + inZ * 0.55, sd.rot);
-    } else if (k % 7 === 4) {
-      const p = room.toWorld(e.i, e.j);
-      const dx = p.x + (e.x - p.x) * 0.6, dz = p.z + (e.z - p.z) * 0.6;
-      kit.place(RNG.getUniform() < 0.5 ? 'candle_triple' : depthDef.props[k % depthDef.props.length], dx, 0, dz, sd.rot);
+      e.banner = true;
     }
   }
   for (const t of torchSpots) kit.place('torch_mounted', t.x, 2.4, t.z, t.rot);
   room.torches = torchSpots;
+
+  dressRoom(room, kit, depthDef, wallEdges);
 
   group.add(kit.end());
 

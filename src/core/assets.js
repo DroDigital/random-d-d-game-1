@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
 const PACK = () => window.__AO_PACK || {};
 
@@ -27,6 +28,7 @@ manager.setURLModifier((u) => {
 });
 
 const gltfLoader = new GLTFLoader(manager);
+gltfLoader.setMeshoptDecoder(MeshoptDecoder); // the pixel-art prop atlas is meshopt-compressed
 const texLoader = new THREE.TextureLoader(manager);
 
 function dataURIToArrayBuffer(uri) {
