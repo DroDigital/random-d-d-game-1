@@ -10,7 +10,15 @@ export class Boss extends Enemy {
     this.isBoss = true; this.key = key;
     this.radius = key === 'golem' ? 2.2 : key === 'wyrm' ? 2.8 : 1.2;
     this.phase = 1; this.queue = []; this.moveCd = 2.0; this.lastMove = null;
-    this.cdMul = game.vows.has('haste') ? 0.8 : 1;
+    this.cdMul = (game.vows.has('haste') ? 0.8 : 1) * 0.88;
+    // bosses scale harder with the party than regular foes (they are the
+    // whole party's focus), and their poise grows with their health so a
+    // strong party cannot keep them stun-locked
+    const party = game.heroes.length;
+    const scale = (1 + 0.6 * (party - 1)) * (1 + game.depthIndex * 0.12);
+    this.maxHp = this.hp = Math.round(def.hp * scale);
+    this.poiseMax = Math.round(def.poise * scale * 1.6);
+    this.poiseLock = 0;
   }
 
   schedule(t, fn) { this.queue.push({ t, fn }); }
@@ -20,7 +28,9 @@ export class Boss extends Enemy {
       const q = this.queue[i]; q.t -= dt;
       if (q.t <= 0) { this.queue.splice(i, 1); if (this.alive) q.fn(); }
     }
+    if (this.poiseLock > 0) { this.poiseLock -= dt; this.poise = 0; }
     if (this.alive && this.phase === 1 && this.hp < this.maxHp * 0.5) this.enterPhase2();
+    if (this.alive && this.phase === 2 && this.hp < this.maxHp * 0.2) this.enterPhase3();
     if (this.airborne) {
       this.airT -= dt;
       this.hover += (6 - this.hover) * Math.min(1, dt * 3);
@@ -43,6 +53,19 @@ export class Boss extends Enemy {
     this.speed *= 1.15; this.cdMul *= 0.8;
     g.ui.bossPhase && g.ui.bossPhase(2);
   }
+
+  // last stand: faster, angrier, briefly unstaggerable
+  enterPhase3() {
+    const g = this.game;
+    this.phase = 3;
+    this.cdMul *= 0.82; this.speed *= 1.1;
+    this.poiseLock = Math.max(this.poiseLock, 6);
+    g.fx.text(this.key === 'wyrm' ? 'CINDERMAW BURNS WHITE' : this.key === 'golem' ? 'THE BONES ROAR' : 'THE BISHOP UNRAVELS', this.pos.x, this.height + 1.5, this.pos.z, { color: '#ffb347', big: true, life: 2 });
+    this.setGlowOnce();
+    g.shake(0.5); g.flash(0.2, '#ff8a3a', 0.2);
+    audio.play('crit', { vol: 0.7 });
+  }
+  setGlowOnce() { if (this.model && !this.enraged) { this.enraged = true; this.model.setGlow('#ff3a1a', 0.35); } }
 
   // override chase logic with move selection
   think(dt, t, speedMul) {

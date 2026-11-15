@@ -6,7 +6,7 @@ death saves, spell slots), and mix in another genre.
 
 ---
 
-## 1. ASHEN OATH — souls-like × roguelite × 5e (★ built in this repo)
+## 1. OATHGUARD (working title: Ashen Oath) — souls-like × roguelite × 5e (★ built in this repo)
 
 > *"A couch co-op souls-roguelite of the Fifth Edition."*
 
@@ -83,7 +83,7 @@ two defend. Raids escalate in Challenge Rating, and you level your company.
 
 ---
 
-### Why Ashen Oath was the one to build
+### Why Oathguard was the one to build
 
 It is the most immediately *fun on a couch*: real-time action reads well on
 one screen, every input gives instant feedback (and a satisfying die), the

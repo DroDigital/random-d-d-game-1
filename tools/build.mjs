@@ -1,4 +1,4 @@
-// Ashen Oath build script.
+// Oathguard build script.
 // Produces a fully self-contained `play/` folder that runs by double-clicking
 // play/index.html on Windows, macOS and Linux (no server, no engine, no install).
 //

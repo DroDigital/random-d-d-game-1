@@ -77,6 +77,7 @@ export class Projectile {
     if (this.look.model) this.obj.rotation.y = Math.PI / 2 - this.angle;
     else this.obj.material.rotation = -this.angle;
     if (this.light) { this.light.position.set(this.x, this.y + 0.5, this.z); }
+    if (this.look.model && Math.random() < 0.8) g.fx.spawn('spark_04', { x: this.x, y: this.y, z: this.z, life: 0.16, size: 0.32, grow: -0.3, color: this.look.color, opacity: 0.7 });
     if (this.look.trail && Math.random() < 0.7) g.fx.spawn(this.look.trail, { x: this.x, y: this.y, z: this.z, life: 0.25, size: this.look.size * 0.8, grow: -0.5, color: this.look.color });
 
     if (this.kind === 'fireball' && this.dist >= this.travel) { this.explode(); return; }
@@ -84,6 +85,7 @@ export class Projectile {
     if (g.room.solidAt(this.x, this.z, true)) { this.impactFx(); if (this.kind === 'fireball') this.explode(); else this.kill(); return; }
     const c = g.room.toCell(this.x, this.z);
     if (g.room.blockTall && g.room.blockTall[g.room.idx(c.i, c.j)] && !this.homing) { this.impactFx(); this.kill(); return; }
+    if (g.hazards && g.hazards.projectile(this)) { this.impactFx(); if (this.kind === 'fireball') this.explode(); else this.kill(); return; }
 
     if (this.enemy) {
       for (const h of g.heroes) {
@@ -145,6 +147,7 @@ export class Projectile {
     g.shake(0.6); audio.play('explode', { vol: 0.9 });
     for (const e of g.enemies) if (e.alive && Math.hypot(e.pos.x - this.x, e.pos.z - this.z) < 4.5 + e.radius) heroSaveDamage(g, h, e, { dice: '6d6', type: 'fire', ability: 'dex' });
     this.kill();
+    g.hazards && g.hazards.blast(this.x, this.z, 4.5, h);
   }
 }
 

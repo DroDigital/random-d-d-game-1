@@ -22,7 +22,7 @@ function damageMultiplier(target, type) {
 }
 
 // Apply typed damage parts [{amount, type}] to a target. Returns total dealt.
-export function applyDamage(game, source, target, parts, { crit = false, poise = 1, knock = 0, angle = null, silent = false, heavy = false } = {}) {
+export function applyDamage(game, source, target, parts, { crit = false, poise = 1, knock = 0, angle = null, silent = false, heavy = false, impact = true } = {}) {
   if (!target.alive) return 0;
   let total = 0;
   const shown = [];
@@ -41,11 +41,16 @@ export function applyDamage(game, source, target, parts, { crit = false, poise =
       game.fx.text('UNCANNY', target.pos.x, 3, target.pos.z, { color: '#7fae8e' });
     }
     target.takeDamage(total, source, { crit, poise: poise * total, knock, angle, heavy });
+    // hit feel: hitstop, camera punch, sparks, flinch, rumble (scaled to the blow)
+    if (impact && source && source.isHero && !target.isHero && game.impact) game.impact({ target, source, amount: total, crit, heavy, kill: !target.alive, angle });
   }
   if (!silent) {
     let y = (target.height || 2.4) + 0.4;
+    // bigger numbers for bigger hits (relative to the target's health)
+    const rel = target.maxHp ? Math.min(1, total / target.maxHp) : 0;
+    const size = crit ? 1.55 : 1 + rel * 0.7 + (heavy ? 0.15 : 0);
     for (const s of shown) {
-      game.fx.text(s.str + (s.vuln ? '!' : ''), target.pos.x, y, target.pos.z, { color: s.color, big: crit, size: crit ? 1.2 : 1 });
+      game.fx.text(s.str + (s.vuln ? '!' : ''), target.pos.x, y, target.pos.z, { color: s.color, big: crit || rel > 0.35, size, shake: crit });
       y += 0.5;
     }
   }
@@ -121,10 +126,12 @@ export function heroAttack(game, hero, target, opts = {}) {
   if (target.marked && target.marked.owner === hero && target.marked.time > 0) parts.push({ amount: rollDice('1d6', { crit: res.crit }), type: 'force' });
   if (hero.cls.id === 'ranger' && hero.level >= 3 && target.hp < target.maxHp && (target.colossusCd || 0) <= 0) { parts.push({ amount: rollDice('1d8', { crit: res.crit }), type: spec.type || a.type }); target.colossusCd = 1; }
   if (hero.cls.id === 'druid' && hero.level >= 7 && spec.kind === 'melee') parts.push({ amount: rollDice('1d8', { crit: res.crit }), type: 'radiant' });
-  if (heavy && hero.flags.has('smite')) parts.push({ amount: rollDice('2d8', { crit: res.crit }), type: 'radiant' });
+  // boon riders and smites only ride the first swing of an Extra Attack
+  const first = !opts.noDie;
+  if (first && heavy && hero.flags.has('smite')) parts.push({ amount: rollDice('2d8', { crit: res.crit }), type: 'radiant' });
   if (hero.flags.has('prey') && target.hp < target.maxHp && (target.preyCd || 0) <= 0) { parts.push({ amount: rollDice('1d8'), type: spec.type || a.type }); target.preyCd = 1; }
   if (hero.flags.has('shatter') && target.has && target.has('frozen')) parts.push({ amount: rollDice('1d10'), type: 'cold' });
-  for (const oh of hero.onHit) {
+  for (const oh of first ? hero.onHit : []) {
     if (oh.only && !(target.tags || []).some((t) => oh.only.includes(t))) continue;
     if (oh.wounded && target.hp >= target.maxHp) continue;
     let amt = rollDice(oh.dice, { crit: res.crit });

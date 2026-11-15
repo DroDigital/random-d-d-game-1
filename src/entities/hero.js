@@ -11,6 +11,7 @@ import { frand } from '../core/rules.js';
 import { t } from '../i18n/index.js';
 
 const STAM_MAX = 100;
+const LOCK_RANGE = 28;
 export const RAISE_TIME = 2.6; // seconds of holding Interact to raise a slain ally
 const DODGE_COST = 24;
 
@@ -49,6 +50,8 @@ export class Hero extends Actor {
     this.uncanny = 0; this.indomitable = 1; this.luck = 0;
     this.attackCount = 0; this.hitCount = 0;
     this.stepT = 0;
+    this.counters = { moved: 0, attacks: 0, heavy: 0, dodges: 0, skills: 0, potions: 0, lock: 0, revives: 0 };
+    this.lockTarget = null;
     this.stats = { dealt: 0, taken: 0, kills: 0, crits: 0, nat20: 0, nat1: 0, revives: 0, downs: 0 };
     this.recompute(true);
     this.potions = this.potionsMax;
@@ -110,7 +113,7 @@ export class Hero extends Actor {
 
   async spawnModel(lib) {
     const c = this.cls;
-    this.model = await lib.instance({ path: 'heroes/' + c.model + '.glb', rig: 'Rig_Medium', height: 2.55, gear: c.gear, skin: this.skin ? { base: c.skinBase, name: this.skin } : null });
+    this.model = await lib.instance({ path: 'heroes/' + c.model + '.glb', rig: 'Rig_Medium', rim: 'hero', height: 2.55, gear: c.gear, skin: this.skin ? { base: c.skinBase, name: this.skin } : null });
     this.model.loop('Idle_A');
     this.game.scene.add(this.model.root);
     this.shadow = this.game.fx.blobShadow(1.8);
@@ -119,11 +122,16 @@ export class Hero extends Actor {
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.08, 24), new THREE.MeshBasicMaterial({ color: this.color, transparent: true, opacity: 0.7, depthWrite: false }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.09;
     this.ring = ring; this.game.scene.add(ring);
+    // lock-on marker: a rotating dashed ring under the locked target
+    const lr = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.55, 6, 1, 0, Math.PI * 2), new THREE.MeshBasicMaterial({ color: this.color, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide }));
+    lr.rotation.x = -Math.PI / 2; lr.visible = false;
+    this.lockRing = lr; this.game.scene.add(lr);
     this.lantern = this.game.fx.persistentLight({ x: this.pos.x, y: 3.2, z: this.pos.z, color: 0xffc890, intensity: 26, distance: 18, flicker: 0.2 });
     if (this.lantern) { this.lantern.userData.owner = this; this.lantern.userData.ownerY = 3.4; }
   }
 
   removeModel() {
+    if (this.lockRing) this.game.scene.remove(this.lockRing);
     if (this.model) this.game.scene.remove(this.model.root);
     if (this.shadow) this.game.scene.remove(this.shadow);
     if (this.ring) this.game.scene.remove(this.ring);
@@ -135,6 +143,7 @@ export class Hero extends Actor {
 
   // ---------------- per room / rest -----------------
   onRoomStart() {
+    this.lockTarget = null;
     this.luck = this.flags.has('luck_blade') ? 2 : this.flags.has('lucky') ? 3 : 0;
     this.indomitable = 1;
     if (this.tempHpPerRoom) this.tempHp = Math.max(this.tempHp, this.tempHpPerRoom);
@@ -188,13 +197,22 @@ export class Hero extends Actor {
     if (this.tempHp > 0 && this.flags.has('agathys') && source && source.alive && !source.isHero) applyDamage(this.game, this, source, [{ amount: 5, type: 'cold' }], { silent: false });
     if (this.tempHp > 0) { const ab = Math.min(this.tempHp, amount); this.tempHp -= ab; amount -= ab; }
     this.hp -= amount;
+    // getting hit should hurt to watch too: scaled to how much of your health it took
+    const g = this.game, rel = Math.min(1, amount / this.maxHp), sev = Math.min(1.3, 0.3 + rel * 2.2 + (crit ? 0.4 : 0));
     this.model.hitFlash(0xff3020);
-    this.game.shake(crit ? 0.5 : 0.25);
-    this.game.flash(0.12, '#ff2010');
+    this.pop = Math.min(1, 0.45 + sev * 0.5);
+    g.shake(0.18 + sev * 0.35);
+    g.flash(0.08 + sev * 0.06, '#ff2010', 0.05 + sev * 0.06);
+    g.hurtVignette = Math.min(1, (g.hurtVignette || 0) + 0.3 + sev * 0.4);
+    if (sev > 0.6) { g.hitstop(0.04 + sev * 0.05); g.aberr = Math.max(g.aberr, sev * 0.6); }
+    if (angle !== null) { g.punch.x += Math.cos(angle) * sev * 0.7; g.punch.z += Math.sin(angle) * sev * 0.7; }
     audio.play('hitFlesh', { vol: 0.8 });
-    input.rumble(this.controllerId, crit ? 0.9 : 0.5, crit ? 220 : 120);
-    this.game.fx.blood(this.pos.x, this.pos.z);
-    if (angle !== null && knock) { this.knock.x += Math.cos(angle) * knock; this.knock.z += Math.sin(angle) * knock; }
+    if (sev > 0.7) audio.play('hitHeavy', { vol: 0.5, rate: 0.75 });
+    input.rumble(this.controllerId, Math.min(1, 0.35 + sev * 0.5), 90 + sev * 160);
+    g.fx.blood(this.pos.x, this.pos.z, 0x8a1020, 6 + Math.round(sev * 10));
+    g.fx.spawn('flare_01', { x: this.pos.x, y: 1.5, z: this.pos.z, life: 0.1, size: 1.6 + sev * 1.5, grow: 2, color: 0xff4030 });
+    g.ui.hurt && g.ui.hurt(this, sev);
+    if (angle !== null && knock) { this.knock.x += Math.cos(angle) * knock * (1 + sev * 0.4); this.knock.z += Math.sin(angle) * knock * (1 + sev * 0.4); }
     if (source && !source.isHero && this.flags.has('rebuke') && (this.rebukeCd || 0) <= 0 && source.alive) {
       this.rebukeCd = 3;
       heroSaveDamage(this.game, this, source, { dice: '2d10', type: 'fire', ability: 'dex' });
@@ -249,6 +267,8 @@ export class Hero extends Actor {
 
   // ---------------- targeting helpers -----------------
   autoTarget(range, coneDeg, dirAngle = this.facing) {
+    // a locked-on target always wins (if it is still reasonably in range)
+    if (this.lockValid() && this.distTo(this.lockTarget) <= range * 1.5 + this.lockTarget.radius) return this.lockTarget;
     let best = null, bestScore = 1e9;
     for (const e of this.game.enemies) {
       if (!e.alive || e.hidden) continue;
@@ -267,10 +287,63 @@ export class Hero extends Actor {
     return best;
   }
   desiredAngle() {
+    if (this.lockValid()) return this.dirTo(this.lockTarget);
     const c = this.ctrl;
     if (c && c.aim) return Math.atan2(c.aim.y, c.aim.x);
     if (c && (c.move.x || c.move.y)) return Math.atan2(c.move.y, c.move.x);
     return this.facing;
+  }
+
+  // ---------------- lock-on (ranged classes) -----------------
+  get canLock() { return this.cls.attack.kind !== 'melee'; }
+  lockValid() { const e = this.lockTarget; return !!(e && e.alive && !e.hidden && !e.gone); }
+  lockCandidates() {
+    return this.game.enemies.filter((e) => e.alive && !e.hidden && !e.thrall && this.distTo(e) < LOCK_RANGE);
+  }
+  setLock(e) {
+    this.lockTarget = e || null;
+    if (e) { this.counters.lock++; audio.play('select', { vol: 0.35, rate: 1.3 }); }
+  }
+  // tap: lock onto the best target in front, or cycle to the next one; hold: release
+  updateLock(c, dt) {
+    if (!this.canLock) return;
+    if (this.lockTarget && !this.lockValid()) {
+      // target died: hop to the nearest remaining foe, souls-style
+      const next = this.lockCandidates().sort((a, b) => this.distTo(a) - this.distTo(b))[0];
+      this.lockTarget = next && this.distTo(next) < 20 ? next : null;
+    }
+    if (this.lockValid() && this.distTo(this.lockTarget) > LOCK_RANGE + 6) this.lockTarget = null;
+    if (!c || this.game.inputLocked) return;
+    if (c.pressed('lock')) this.lockHold = 0;
+    if (c.held.lock) {
+      this.lockHold = (this.lockHold || 0) + dt;
+      if (this.lockHold > 0.45 && this.lockTarget) { this.lockTarget = null; this.lockHold = -99; audio.play('back', { vol: 0.3 }); }
+    }
+    if (c.released('lock') && this.lockHold >= 0) {
+      const cands = this.lockCandidates();
+      if (!cands.length) { this.lockTarget = null; return; }
+      if (!this.lockValid()) {
+        // prefer what we're facing, then the closest
+        cands.sort((a, b) => (this.distTo(a) + Math.abs(this.angleDiff(this.dirTo(a), this.facing)) * 6) - (this.distTo(b) + Math.abs(this.angleDiff(this.dirTo(b), this.facing)) * 6));
+        this.setLock(cands[0]);
+      } else {
+        // cycle clockwise by angle around the hero
+        const cur = this.dirTo(this.lockTarget);
+        const rel = (e) => { let d = this.dirTo(e) - cur; while (d <= 0) d += Math.PI * 2; return d; };
+        const next = cands.filter((e) => e !== this.lockTarget).sort((a, b) => rel(a) - rel(b))[0];
+        if (next) this.setLock(next);
+      }
+    }
+    // gamepad: flick the right stick to switch to the foe in that direction
+    if (this.lockValid() && c.aim) {
+      if (!this.aimFlicked) {
+        this.aimFlicked = true;
+        const want = Math.atan2(c.aim.y, c.aim.x);
+        const best = this.lockCandidates().filter((e) => e !== this.lockTarget)
+          .map((e) => ({ e, d: Math.abs(this.angleDiff(this.dirTo(e), want)) })).filter((o) => o.d < 0.9).sort((a, b) => a.d - b.d)[0];
+        if (best) this.setLock(best.e);
+      }
+    } else this.aimFlicked = false;
   }
 
   spendStamina(n) {
@@ -286,13 +359,19 @@ export class Hero extends Actor {
     this.uncanny -= dt; this.rebukeCd = (this.rebukeCd || 0) - dt;
     if (this.model) this.model.update(dt);
     if (this.ring) { this.ring.position.set(this.pos.x, 0.09, this.pos.z); this.ring.visible = !this.dead; }
+    if (this.lockRing) {
+      const lt = this.lockValid() ? this.lockTarget : null;
+      this.lockRing.visible = !!lt && !this.dead;
+      if (lt) { const s2 = Math.max(1, lt.radius * 1.3); this.lockRing.scale.set(s2, s2, s2); this.lockRing.position.set(lt.pos.x, 0.12, lt.pos.z); this.lockRing.rotation.z += dt * 2.5; }
+    }
     if (this.lantern) this.lantern.intensity = this.dead ? 0 : this.lantern.intensity;
 
     if (this.dead) { this.syncModel(dt); return; }
     // a player with a menu panel open steers the panel, not the hero
     const c = this.menuLock ? null : this.ctrl;
 
-    if (this.downed) { this.updateDowned(dt, c); this.syncModel(dt); return; }
+    if (this.downed) { this.lockTarget = null; this.updateDowned(dt, c); this.syncModel(dt); return; }
+    this.updateLock(c, dt);
 
     // regen / auras / timers
     if (this.regen) { this.regenAcc = (this.regenAcc || 0) + this.regen * dt; if (this.regenAcc >= 1) { this.regenAcc -= 1; if (this.hp < this.maxHp) this.hp++; } }
@@ -346,6 +425,13 @@ export class Hero extends Actor {
         const t = 1 - Math.max(0, this.stateT) / this.dodgeDur;
         const sp = this.dodgeSpeed * (1 - t * 0.7);
         this.move(Math.cos(this.dodgeDir) * sp * dt, Math.sin(this.dodgeDir) * sp * dt);
+        // speed trail in the hero's colour
+        this.trailT = (this.trailT || 0) - dt;
+        if (this.trailT <= 0) {
+          this.trailT = 0.025;
+          g.fx.spawn('smoke_03', { x: this.pos.x, y: 1.15, z: this.pos.z, life: 0.3, size: 1.9, grow: -1.1, color: this.color, opacity: 0.9 });
+          g.fx.spawn('spark_04', { x: this.pos.x + frand(-0.3, 0.3), y: frand(0.6, 1.8), z: this.pos.z + frand(-0.3, 0.3), life: 0.3, size: 0.25, color: 0xffffff, opacity: 0.8 });
+        }
         if (this.stateT <= 0) { this.state = 'free'; if (this.queued === 'attack') { this.queued = null; this.startAttack(false); } }
         if (c && c.pressed('attack')) this.queued = 'attack';
         break;
@@ -392,23 +478,28 @@ export class Hero extends Actor {
     // interact (revive / world interactions)
     if (c && !g.inputLocked && this.state === 'free' && c.pressed('interact')) {
       const tgt = g.heroes.find((h) => h !== this && h.downed && h.distTo(this) < 3) || g.heroes.find((h) => h !== this && h.dead && h.distTo(this) < 3);
-      if (tgt) { this.state = 'revive'; this.reviveTarget = tgt; this.reviveProgress = 0; this.model.loop('Interact'); }
+      if (tgt) { this.state = 'revive'; this.reviveTarget = tgt; this.reviveProgress = 0; this.counters.revives++; this.model.loop('Interact'); }
       else g.interact(this);
     }
 
     // movement
     let speed = this.speed * moveMul;
     if (this.has('slowed')) speed *= 0.6;
+    if (this.has('webbed')) speed *= 0.5;
     if (this.exhausted) speed *= 0.8;
     if (this.has('rage')) speed *= 1.05;
     if (this.has('dash')) speed *= 1.6;
     const ml = Math.hypot(mv.x, mv.y);
     if (ml > 0.05 && moveMul > 0 && !g.inputLocked) {
       this.move(mv.x * speed * dt, mv.y * speed * dt);
+      this.counters.moved += ml * speed * dt;
       if (this.state === 'free') this.turnTowards(this.desiredAngle(), 16, dt);
       this.stepT -= dt * ml * speed;
-      if (this.stepT <= 0) { this.stepT = 2.6; audio.play('step', { vol: 0.18 }); }
-    } else if (this.state === 'free' && c && c.aim) this.turnTowards(this.desiredAngle(), 16, dt);
+      if (this.stepT <= 0) {
+        this.stepT = 2.6; audio.play('step', { vol: 0.18 });
+        if (speed > 5) g.fx.spawn('smoke_03', { x: this.pos.x - mv.x * 0.6, y: 0.25, z: this.pos.z - mv.y * 0.6, vy: 0.4, life: 0.45, size: 0.7, grow: 0.8, color: 0x8a7a68, additive: false, opacity: 0.45 });
+      }
+    } else if (this.state === 'free' && ((c && c.aim) || this.lockValid())) this.turnTowards(this.desiredAngle(), 16, dt);
     this.applyKnock(dt);
     // leash to party centroid so the shared camera works
     const lc = g.leashCenter;
@@ -420,7 +511,12 @@ export class Hero extends Actor {
 
     // animation base loop
     if (this.state === 'free' || this.state === 'potion' || this.state === 'cast') {
-      if (ml > 0.05) this.model.loop(this.cls.id === 'ranger' ? 'Running_HoldingBow' : (speed > 5 ? 'Running_A' : 'Walking_A'), { speed: Math.max(0.6, speed / 6.2) });
+      if (ml > 0.05 && this.lockValid()) {
+        // locked on: strafe / backpedal while facing the target
+        const rel = this.angleDiff(Math.atan2(mv.y, mv.x), this.facing);
+        const anim = Math.abs(rel) < 0.8 ? (this.cls.id === 'ranger' ? 'Running_HoldingBow' : 'Running_A') : Math.abs(rel) > 2.3 ? 'Walking_Backwards' : rel > 0 ? 'Running_Strafe_Right' : 'Running_Strafe_Left';
+        this.model.loop(anim, { speed: Math.max(0.6, speed / 6.2) });
+      } else if (ml > 0.05) this.model.loop(this.cls.id === 'ranger' ? 'Running_HoldingBow' : (speed > 5 ? 'Running_A' : 'Walking_A'), { speed: Math.max(0.6, speed / 6.2) });
       else this.model.loop(this.cls.id === 'barbarian' ? 'Melee_2H_Idle' : 'Idle_A');
     }
     this.syncModel(dt);
@@ -452,6 +548,7 @@ export class Hero extends Actor {
     const ml = Math.hypot(mv.x, mv.y);
     this.dodgeDir = ml > 0.1 ? Math.atan2(mv.y, mv.x) : this.facing + Math.PI;
     if (!this.has('surge')) this.spendStamina(this.dodgeCost);
+    this.counters.dodges++;
     this.interrupt();
     if (this.flags.has('blink_dodge')) {
       // misty step: instant short teleport
@@ -467,6 +564,7 @@ export class Hero extends Actor {
       this.model.once('Dodge_Forward', { duration: 0.44 });
     }
     audio.play('dodge', { vol: 0.5 });
+    for (let i = 0; i < 6; i++) this.game.fx.spawn('smoke_03', { x: this.pos.x, y: 0.3, z: this.pos.z, vx: -Math.cos(this.dodgeDir) * frand(1, 3) + frand(-1, 1), vz: -Math.sin(this.dodgeDir) * frand(1, 3) + frand(-1, 1), vy: frand(0.3, 1), life: 0.5, size: 0.8, grow: 1, color: 0x8a7a68, additive: false, opacity: 0.5 });
     if (this.flags.has('ice_dodge')) {
       this.game.fx.burst('star_05', this.pos.x, 0.6, this.pos.z, 12, { color: 0x8fd3ff, speed: 6, up: 1 });
       for (const e of this.game.enemies) if (e.alive && e.distTo(this) < 4) heroSaveDamage(this.game, this, e, { dice: '2d6', type: 'cold', ability: 'dex' });
@@ -504,6 +602,7 @@ export class Hero extends Actor {
     if (!ranged) setTimeout(() => audio.play('swing', { vol: 0.45 }), windup * 600);
     if (heavy) this.game.fx.burst('spark_06', this.pos.x, 1.6, this.pos.z, 5, { color: 0xffe0a0, speed: 1.5, up: 1, size: 0.6 });
     this.attackCount++;
+    this.counters.attacks++; if (heavy) this.counters.heavy++;
   }
 
   strike(atk) {
@@ -512,14 +611,15 @@ export class Hero extends Actor {
     const swings = this.extraAttack ? 2 : 1;
     if (!ranged) {
       const reach = spec.reach || a.reach, arc = spec.arc || a.arc;
-      g.fx.slash(this.pos.x, this.pos.z, this.facing, { size: reach * 1.55, color: atk.heavy ? 0xffd28a : 0xfff1d0, tex: arc >= 360 ? 'twirl_02' : 'slash_03' });
+      g.fx.slash(this.pos.x, this.pos.z, this.facing, { size: reach * (atk.heavy ? 1.85 : 1.55), color: atk.heavy ? 0xffd28a : 0xfff1d0, tex: arc >= 360 ? 'twirl_02' : 'slash_03', life: atk.heavy ? 0.26 : 0.2 });
+      if (atk.heavy) g.fx.slash(this.pos.x, this.pos.z, this.facing + 0.25, { size: reach * 1.6, color: 0xff9a50, tex: 'slash_02', life: 0.22 });
       let hitAny = false;
       const targets = g.enemies.filter((e) => e.alive && !e.hidden && this.inArc(e, arc, reach));
       for (const e of targets) {
         for (let s = 0; s < swings && e.alive; s++) { const r = heroAttack(g, this, e, { heavy: atk.heavy, noDie: s > 0 }); if (r.hit) hitAny = true; }
       }
       // breakables
-      for (const b of g.breakables) if (!b.broken && Math.hypot(b.x - this.pos.x, b.z - this.pos.z) < reach + 0.8) g.breakProp(b, this);
+      g.hazards.hitArc(this, reach, arc);
       if (hitAny) { audio.play(atk.heavy ? 'hitHeavy' : 'slice', { vol: 0.7 }); g.hitstop(atk.heavy ? 0.07 : 0.035); }
     } else {
       const proj = spec.projectile || a.projectile;
@@ -565,7 +665,7 @@ export class Hero extends Actor {
     }
     if (this.flags.has('scorching_ray') && !isSkill && this.attackCount % 3 === 0 && !this.rayLock) {
       this.rayLock = true;
-      for (let i = 0; i < 3; i++) g.spawnProjectile({ kind: 'ray', owner: this, x: this.pos.x, z: this.pos.z, target, speed: 30, auto: { dice: '2d6', type: 'fire' }, delay: i * 0.08 });
+      for (let i = 0; i < 3; i++) g.spawnProjectile({ kind: 'ray', owner: this, x: this.pos.x, z: this.pos.z, target, speed: 30, auto: { dice: '1d6', type: 'fire' }, delay: i * 0.08 });
       setTimeout(() => { this.rayLock = false; }, 300);
     }
   }
@@ -590,6 +690,7 @@ export class Hero extends Actor {
     if (sk.slot && this.slots <= 0) { g.fx.text('NO SLOTS', this.pos.x, 3.4, this.pos.z, { color: '#9aa0a8' }); audio.play('error', { vol: 0.3 }); return; }
     const ok = this.castSkill(sk.id);
     if (ok === false) return;
+    this.counters.skills++;
     if (sk.slot) this.slots--;
     this.cooldowns[i] = sk.cd * this.cooldownMul;
     if (this.flags.has('thunderwave')) this.thunderwave();
@@ -764,6 +865,7 @@ export class Hero extends Actor {
   drinkPotion() {
     if (this.potions <= 0) { this.game.fx.text('NO POTIONS', this.pos.x, 3.4, this.pos.z, { color: '#9aa0a8' }); audio.play('error', { vol: 0.3 }); return; }
     this.potions--;
+    this.counters.potions++;
     const fast = this.cls.id === 'rogue' && this.level >= 3;
     this.state = 'potion'; this.stateT = fast ? 0.15 : 0.7; this.potionAt = fast ? 0.1 : 0.35; this.potionDone = false;
     if (!fast) this.model.once('Use_Item', { duration: 0.7 });

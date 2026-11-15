@@ -6,27 +6,27 @@ const KB_LAYOUTS = {
     name: 'Keyboard (left)',
     up: ['KeyW'], down: ['KeyS'], left: ['KeyA'], right: ['KeyD'],
     attack: ['Space'], heavy: ['KeyC'], dodge: ['ShiftLeft'], skill1: ['KeyQ'], skill2: ['KeyE'],
-    potion: ['KeyR'], interact: ['KeyF'], pause: ['Escape'], back: ['Escape', 'Backspace'], confirm: ['Space', 'KeyF'],
-    glyph: { attack: 'SPACE', heavy: 'C', dodge: 'SHIFT', skill1: 'Q', skill2: 'E', potion: 'R', interact: 'F', move: 'WASD', confirm: 'SPACE', back: 'ESC' },
+    potion: ['KeyR'], interact: ['KeyF'], lock: ['Tab', 'KeyV'], pause: ['Escape'], back: ['Escape', 'Backspace'], confirm: ['Space', 'KeyF'],
+    glyph: { attack: 'SPACE', heavy: 'C', dodge: 'SHIFT', skill1: 'Q', skill2: 'E', potion: 'R', interact: 'F', lock: 'TAB', move: 'WASD', confirm: 'SPACE', back: 'ESC' },
   },
   kb2: {
     name: 'Keyboard (right)',
     up: ['ArrowUp'], down: ['ArrowDown'], left: ['ArrowLeft'], right: ['ArrowRight'],
     attack: ['Slash', 'Numpad0'], heavy: ['Comma', 'Numpad3'], dodge: ['Period', 'Numpad1'], skill1: ['Semicolon', 'Numpad4'], skill2: ['Quote', 'Numpad5'],
-    potion: ['BracketRight', 'Numpad6'], interact: ['Enter', 'NumpadEnter'], pause: ['Backspace'], back: ['Backspace', 'NumpadDecimal'], confirm: ['Slash', 'Numpad0', 'Enter', 'NumpadEnter'],
-    glyph: { attack: '/', heavy: ',', dodge: '.', skill1: ';', skill2: "'", potion: ']', interact: 'ENTER', move: 'ARROWS', confirm: '/', back: 'BKSP' },
+    potion: ['BracketRight', 'Numpad6'], interact: ['Enter', 'NumpadEnter'], lock: ['KeyL', 'Numpad7'], pause: ['Backspace'], back: ['Backspace', 'NumpadDecimal'], confirm: ['Slash', 'Numpad0', 'Enter', 'NumpadEnter'],
+    glyph: { attack: '/', heavy: ',', dodge: '.', skill1: ';', skill2: "'", potion: ']', interact: 'ENTER', lock: 'L', move: 'ARROWS', confirm: '/', back: 'BKSP' },
   },
 };
 
-const PAD_GLYPH = { attack: 'X', heavy: 'RT', dodge: 'A', skill1: 'LB', skill2: 'RB', potion: 'Y', interact: 'B', move: 'L-STICK', confirm: 'A', back: 'B' };
-const PAD_BTN = { attack: [2], heavy: [7], dodge: [0], skill1: [4], skill2: [5], potion: [3], interact: [1], pause: [9], confirm: [0], back: [1] };
-const ACTIONS = ['attack', 'heavy', 'dodge', 'skill1', 'skill2', 'potion', 'interact', 'pause', 'confirm', 'back', 'up', 'down', 'left', 'right'];
+const PAD_GLYPH = { attack: 'X', heavy: 'RT', dodge: 'A', skill1: 'LB', skill2: 'RB', potion: 'Y', interact: 'B', lock: 'R3', move: 'L-STICK', confirm: 'A', back: 'B' };
+const PAD_BTN = { attack: [2], heavy: [7], dodge: [0], skill1: [4], skill2: [5], potion: [3], interact: [1], lock: [11], pause: [9], confirm: [0], back: [1] };
+const ACTIONS = ['attack', 'heavy', 'dodge', 'skill1', 'skill2', 'potion', 'interact', 'lock', 'pause', 'confirm', 'back', 'up', 'down', 'left', 'right'];
 
 const keys = new Set();
 const tapped = new Set(); // keys pressed since the last poll (so quick taps are never lost on slow frames)
 window.addEventListener('keydown', (e) => {
   keys.add(e.code); if (!e.repeat) tapped.add(e.code);
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Slash', 'Quote', 'Tab'].includes(e.code)) e.preventDefault();
+  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Slash', 'Quote', 'Tab', 'Enter'].includes(e.code)) e.preventDefault();
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('blur', () => keys.clear());

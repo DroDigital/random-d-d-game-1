@@ -1,4 +1,4 @@
-# ASHEN OATH
+# OATHGUARD
 
 *A couch co-op souls-roguelite of the Fifth Edition.*
 
@@ -28,9 +28,9 @@ attach them to a Release):
 
 | OS | Package |
 |---|---|
-| Windows | `AshenOath-Setup-x.y.z.exe` (installer) or `AshenOath-Portable-x.y.z.exe` |
-| macOS | `AshenOath-x.y.z-mac.dmg` (universal: Intel + Apple Silicon) |
-| Linux | `AshenOath-x.y.z-x86_64.AppImage` or `.tar.gz` |
+| Windows | `Oathguard-Setup-x.y.z.exe` (installer) or `Oathguard-Portable-x.y.z.exe` |
+| macOS | `Oathguard-x.y.z-mac.dmg` (universal: Intel + Apple Silicon) |
+| Linux | `Oathguard-x.y.z-x86_64.AppImage` or `.tar.gz` |
 
 The builds are unsigned. On macOS, right-click the app → Open the first time.
 On Windows, choose "More info → Run anyway" in SmartScreen. In the desktop
@@ -101,6 +101,15 @@ Players join on the **Gathering** screen by pressing *Attack* on their device.
   spell-pacts) after fights. Three boons of one pact give an *Attunement*;
   two players with two each form a *Pact Bond* that both share. Spend Ash at
   shrines to level up (1–10).
+- **Living dungeons:** every room is dressed for its depth, with coffins,
+  graves and skull candles in the Crypt, glowing mushrooms and webs in the
+  Ossuary, and crystals, braziers and lava in the Abyss. Urns, pots, crates
+  and barrels shatter for Ash (and the odd potion). Powder kegs blow up and
+  chain into each other, hurting friend and foe alike. Each depth has its
+  own traps: saw blades and spike plates, spore pods and sticky webs, flame
+  vents and molten pools.
+- **Bosses** fight in three phases, scale with party size, and cannot be
+  stun-locked: after a stagger their poise is locked for a few seconds.
 - **Meta:** earn Oath Marks, spend them in the Reliquary, and swear Vows for
   harder runs and bigger rewards.
 
@@ -139,10 +148,11 @@ in-game Credits screen, and the licence files are in
 [`assets/licenses/`](assets/licenses/).
 
 - **3D:** KayKit (Kay Lousberg): Adventurers, Skeletons, Character
-  Animations, Dungeon Remastered, Board Game Bits (CC0). Quaternius:
-  Ultimate Monsters (CC0).
+  Animations, Dungeon Remastered, Halloween Bits, Board Game Bits (CC0).
+  Quaternius: Ultimate Monsters (CC0). CodePawl: Pixel Art Atlas 3D props,
+  built from Pixel Art Atlas by Angais (CC0).
 - **2D:** Dungeon Crawl Stone Soup tiles (CC0). Kenney: Particle Pack,
-  Smoke Particles, Light Masks, Fantasy UI Borders (CC0). game-icons.net
+  Smoke Particles, Explosion Pack, Light Masks, Fantasy UI Borders (CC0). game-icons.net
   (CC BY 3.0: Lorc, Delapouite, Skoll and others).
 - **Audio:** Kenney RPG Audio, Impact Sounds, Interface Sounds, Music Loops,
   Music Jingles, Fighter Voiceover (CC0). Ninja Adventure music by

@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { PSXRenderer, PALETTES, settings as psxSettings } from './render/psx.js';
 import { FX } from './render/fx.js';
+import { Atmos } from './render/atmos.js';
+import { Hazards } from './world/hazards.js';
 import { ModelLib } from './render/models.js';
 import { Kit } from './world/kit.js';
 import { generateRoom, buildRoom, CELL, SIDE } from './world/room.js';
@@ -19,7 +21,7 @@ import { audio } from './core/audio.js';
 import { input } from './core/input.js';
 import { meta } from './core/meta.js';
 import { loadGLTF, url } from './core/assets.js';
-import { retroify } from './render/psx.js';
+import { retroify, rimUniforms } from './render/psx.js';
 import { t, canvasFont } from './i18n/index.js';
 import { PACTS } from './data/boons.js';
 
@@ -42,6 +44,7 @@ export class Game {
     this.time = 0; this.timeScale = 1; this.hitstopT = 0; this.shakeT = 0; this.flashT = 0;
     this.mode = 'boot';
     this.camTarget = new THREE.Vector3(); this.camDist = 1;
+    this.punch = { x: 0, z: 0 }; this.zoomPunch = 0; this.aberr = 0; this.slowmoT = 0;
     this.logLines = [];
     this.roomStats = { hitsTaken: 0 };
     this.depthIndex = 0;
@@ -59,6 +62,8 @@ export class Game {
     this.scene.background = new THREE.Color(0x000000);
     progress(0.05, 'Loading effects');
     await this.fx.load();
+    this.atmos = new Atmos(this);
+    this.hazards = new Hazards(this);
     progress(0.15, 'Loading dungeon kit');
     await this.kit.load((p) => progress(0.15 + p * 0.25, 'Loading dungeon kit'));
     progress(0.4, 'Loading animation rigs');
@@ -78,7 +83,45 @@ export class Game {
   log(msg, color = '#cfc7b4') { this.logLines.push({ msg, color, t: 7 }); if (this.logLines.length > 7) this.logLines.shift(); this.ui && this.ui.updateLog(this.logLines); }
   shake(a) { this.shakeT = Math.max(this.shakeT, a); }
   hitstop(t) { this.hitstopT = Math.max(this.hitstopT, t); }
-  flash(t, color = '#ffffff') { this.flashT = t; this.flashMax = t; this.psx.post.uniforms.uFlashColor.value.setStyle(color, THREE.LinearSRGBColorSpace); }
+  flash(t, color = '#ffffff', amt = 0.45) { this.flashT = t; this.flashMax = t; this.flashAmt = amt; this.psx.post.uniforms.uFlashColor.value.setStyle(color, THREE.LinearSRGBColorSpace); }
+
+  // Hit feel. Everything scales with how hard the blow was relative to the
+  // target: small pokes get a tick, heavy hits / crits / kills get the works.
+  impact({ target, source, amount, crit, heavy, kill, angle }) {
+    const rel = Math.min(1, amount / Math.max(8, target.maxHp * 0.4));
+    let s = 0.2 + rel * 0.6 + (heavy ? 0.3 : 0) + (crit ? 0.45 : 0) + (kill ? 0.35 : 0);
+    if (target.isBoss) s *= 0.8;
+    s = Math.min(1.4, s);
+    const a = angle ?? (source ? source.dirTo(target) : 0);
+    const cx = Math.cos(a), cz = Math.sin(a);
+    const x = target.pos.x - cx * target.radius * 0.6, z = target.pos.z - cz * target.radius * 0.6;
+    const y = (target.height || 2.4) * 0.55 + (target.hover || 0);
+    if (s > 0.3) this.hitstop(Math.min(0.16, 0.025 + s * 0.09));
+    this.punch.x += cx * s * 0.8; this.punch.z += cz * s * 0.8;
+    this.zoomPunch = Math.max(this.zoomPunch, s * 0.045);
+    this.shake(0.06 + s * 0.28);
+    // white impact flash at the point of contact
+    this.fx.spawn('flare_01', { x, y, z, life: 0.09 + 0.05 * s, size: 1.4 + s * 2.4, grow: 2, color: crit ? 0xffe27a : 0xffffff });
+    this.fx.spawn('star_07', { x, y, z, life: 0.12, size: 0.8 + s * 2, grow: 3, spin: 8, color: crit ? 0xffc040 : 0xfff2d8 });
+    // sparks thrown out along the blow
+    const n = 3 + Math.round(s * 10);
+    for (let i = 0; i < n; i++) {
+      const sa = a + frand(-0.7, 0.7), sp = frand(5, 11) * (0.6 + s * 0.6);
+      this.fx.spawn(i % 3 ? 'spark_04' : 'spark_06', { x, y, z, vx: Math.cos(sa) * sp, vz: Math.sin(sa) * sp, vy: frand(1, 6), gravity: -18, life: frand(0.18, 0.4), size: frand(0.25, 0.55), color: crit ? 0xffd060 : 0xfff0c0 });
+    }
+    this.fx.light({ x, y: y + 0.5, z, color: crit ? 0xffd27a : 0xfff0d8, intensity: 6 + s * 10, distance: 9, life: 0.12 + s * 0.08 });
+    // ground shockwave for heavy blows, crits and kills
+    if (heavy || crit || kill) this.fx.decal('circle_05', { x: target.pos.x, z: target.pos.z, size: 2.5 + s * 2, color: crit ? 0xffd27a : 0xffffff, opacity: 0.55, life: 0.28, grow: 1.6 });
+    if (crit) { this.aberr = Math.max(this.aberr, 1); this.flash(0.06, '#fff6e0', 0.16); }
+    else if (heavy || kill) this.aberr = Math.max(this.aberr, 0.4);
+    if (heavy || crit) audio.play('hitFlesh', { vol: 0.6, rate: 0.7 });
+    if (source && source.controllerId) input.rumble(source.controllerId, Math.min(1, 0.12 + s * 0.55), 45 + s * 110);
+    // last foe of the room: a short slow-motion beat on the killing blow
+    if (kill && this.combatActive && !target.isBoss && this.waveIndex >= this.waves.length && !this.enemies.some((e) => e.alive && !e.thrall && e !== target)) {
+      this.slowmoT = 0.6; this.aberr = Math.max(this.aberr, 0.8);
+      audio.play('explode', { vol: 0.5, rate: 0.6 });
+    }
+  }
 
   // ---------------------------------------------------------------- scenes
   clearRoom() {
@@ -94,13 +137,26 @@ export class Game {
     this.enemies = []; this.projectiles = []; this.zones = []; this.pickups = []; this.breakables = []; this.interactables = []; this.doors = []; this.extra = [];
     this.fx.clear();
     this.fx.clearLights();
-    for (const h of this.heroes) if (h.model) { h.lantern = this.fx.persistentLight({ x: h.pos.x, y: 3.2, z: h.pos.z, color: 0xffc890, intensity: 26, distance: 18, flicker: 0.2 }); if (h.lantern) { h.lantern.userData.owner = h; h.lantern.userData.ownerY = 3.4; } }
+    this.atmos && this.atmos.clear();
+    this.hazards && this.hazards.clear();
+    this.shrineFire = null;
+    this.ui && this.ui.clearTips();
+    this.ui && this.ui.bossBar(null);
+    for (const h of this.heroes) if (h.model) { h.lantern = this.fx.persistentLight({ x: h.pos.x, y: 3.2, z: h.pos.z, color: 0xffc890, intensity: (this.run && this.run.depth.look && this.run.depth.look.lantern) || 26, distance: 18, flicker: 0.2 }); if (h.lantern) { h.lantern.userData.owner = h; h.lantern.userData.ownerY = 3.4; } }
   }
 
   applyDepthLook(depth, paletteKey = null) {
     this.psx.setPalette(PALETTES[paletteKey || depth.palette]);
     this.scene.fog.color.set(depth.fog);
     this.ambient.color.set(depth.ambient);
+    const L = depth.look || {};
+    this.ambient.intensity = L.ambientI ?? 3;
+    this.hemi.color.set(L.hemiSky ?? 0x9aa8c8); this.hemi.groundColor.set(L.hemiGround ?? 0x302018); this.hemi.intensity = L.hemiI ?? 1.3;
+    this.dirLight.color.set(L.dir ?? 0xc0b0ff); this.dirLight.intensity = L.dirI ?? 1.1;
+    rimUniforms.foe.color.value.set(L.rim ?? 0x8fb4ff);
+    const u = this.psx.post.uniforms;
+    u.uTint.value.setRGB(...(L.tint || [1, 1, 1])); u.uLift.value = L.lift ?? 0.02;
+    this.psx.bloomStrength = L.bloom ?? 1;
   }
 
   async buildTitleScene() {
@@ -113,14 +169,16 @@ export class Game {
     this.room = room;
     this.roomGroup = buildRoom(room, this.kit, depth);
     this.scene.add(this.roomGroup);
+    this.atmos.build(room, depth, { calm: true });
+    this.hazards.build(room);
     this.addTorchLights(room, depth);
     this.addShrine(0, 0, true);
     this.titleHeroes = [];
     const lineup = ['fighter', 'rogue', 'wizard', 'druid'];
     for (let k = 0; k < 4; k++) {
       const c = CLASSES[lineup[k]];
-      const m = await this.models.instance({ path: 'heroes/' + c.model + '.glb', rig: 'Rig_Medium', height: 2.55, gear: c.gear });
-      const a = -Math.PI / 2 + (k - 1.5) * 0.55 + Math.PI;
+      const m = await this.models.instance({ path: 'heroes/' + c.model + '.glb', rig: 'Rig_Medium', rim: 'hero', height: 2.55, gear: c.gear });
+      const a = -Math.PI / 2 + (k - 1.5) * 0.62; // far side of the fire, facing the camera
       m.root.position.set(Math.cos(a) * 4.2, 0, Math.sin(a) * 4.2 + 0.5);
       m.root.rotation.y = Math.PI / 2 - Math.atan2(-m.root.position.z, -m.root.position.x);
       m.loop(k % 2 ? 'Idle_B' : 'Idle_A');
@@ -136,6 +194,7 @@ export class Game {
       flame.position.set(t.x + t.nx * 0.35, 3.25, t.z + t.nz * 0.35); flame.scale.set(0.9, 1.3, 1);
       flame.userData.flicker = Math.random() * 10;
       this.scene.add(flame); this.extra.push(flame);
+      this.atmos.addHalo(flame.position.x, 3.25, flame.position.z, depth.torch);
       if (n < 5 && (n === 0 || Math.random() < 0.8)) {
         this.fx.persistentLight({ x: t.x + t.nx * 1.2, y: 3.4, z: t.z + t.nz * 1.2, color: depth.torch, intensity: 22, distance: 16, flicker: 0.5 });
         n++;
@@ -178,6 +237,7 @@ export class Game {
     }
     if (meta.has('kindled')) for (const h of this.heroes) { const b = draftBoons(h, { minRarity: 'uncommon', count: 1 })[0]; if (b) this.grantBoon(h, b, true); }
     this.mode = 'play';
+    this.ui.hints.reset();
     audio.voice('prepare_yourself');
     await this.enterRoom('shrine', true);
   }
@@ -203,6 +263,8 @@ export class Game {
     this.roomType = type;
     this.roomGroup = buildRoom(room, this.kit, depth);
     this.scene.add(this.roomGroup);
+    this.atmos.build(room, depth, { calm: room.kind !== 'combat' && room.kind !== 'boss' });
+    this.hazards.build(room);
     this.addTorchLights(room, depth);
     this.buildDoors();
     // heroes at the entrance
@@ -226,7 +288,6 @@ export class Game {
     else if (type === 'altar') this.setupAltar();
     else if (type === 'boss') await this.setupBoss();
     else this.setupCombat(type);
-    this.addBreakables();
     // ash remains from a previous wipe
     if (run.remains && run.remains.depthIndex === run.depthIndex && run.remains.roomIndex === run.roomIndex) this.placeRemains();
     room.computeFlow(this.heroes.map((h) => h.pos));
@@ -317,7 +378,7 @@ export class Game {
     audio.music('peddler');
     this.setCleared(true);
     const x = 0, z = -3;
-    this.models.instance({ path: 'heroes/Mage.glb', rig: 'Rig_Medium', height: 2.6, gear: { r: 'staff' }, skin: { base: 'mage', name: 'alt_C' } }).then((m) => {
+    this.models.instance({ path: 'heroes/Mage.glb', rig: 'Rig_Medium', rim: 'hero', height: 2.6, gear: { r: 'staff' }, skin: { base: 'mage', name: 'alt_C' } }).then((m) => {
       m.root.position.set(x, 0, z); m.loop('Idle_B'); this.scene.add(m.root); this.extra.push(m.root); this.peddlerModel = m;
     });
     for (const [px, pz, n] of [[-2.4, -3.5, 'chest_large_gold'], [2.4, -3.5, 'barrel_small_stack'], [-3.5, -1.5, 'coin_stack_large']]) { const c = this.kit.clone(n); c.position.set(px, 0, pz); this.scene.add(c); this.extra.push(c); }
@@ -443,7 +504,7 @@ export class Game {
       const amt = 800 + depth * 600;
       const bp = this.bossPos || { x: 0, z: 0 };
       for (let i = 0; i < 16; i++) this.dropAsh(bp.x + frand(-3, 3), bp.z + frand(-3, 3), Math.round(amt / 16));
-      this.heroes.forEach((h) => this.ui.openDraft(h, draftBoons(h, { depth: depth + 1, minRarity: 'rare', legendaryBoost: 4 })));
+      this.heroes.forEach((h) => this.ui.openDraft(h, draftBoons(h, { depth: depth + 1, minRarity: 'rare', legendaryBoost: 2.5 })));
     }
   }
 
@@ -545,6 +606,10 @@ export class Game {
   }
   lootChest() {
     this.chestPending = false;
+    this.fx.burst('star_05', 0, 1.2, -1, 24, { color: 0xffd060, speed: 6, up: 7, gravity: -8, size: 0.7 });
+    this.fx.burst('flare_01', 0, 1.5, -1, 3, { color: 0xffe0a0, speed: 1, up: 1, size: 3, life: 0.4 });
+    this.fx.light({ x: 0, y: 2.5, z: -1, color: 0xffd060, intensity: 20, distance: 14, life: 0.8 });
+    this.shake(0.2); this.hitstop(0.05);
     for (const d of this.doors) d.open = true;
     for (let i = 0; i < 8; i++) this.dropAsh(frand(-2, 2), frand(-3, 1), Math.round((60 + this.run.depthIndex * 40) / 2));
     this.heroes.forEach((h) => this.ui.openDraft(h, draftBoons(h, { depth: this.run.depthIndex, minRarity: 'rare', legendaryBoost: 2 })));
@@ -559,6 +624,9 @@ export class Game {
     hero.hp = hero.maxHp; hero.slots = hero.slotsMax;
     audio.play('levelUp', { vol: 0.8 });
     this.fx.burst('star_05', hero.pos.x, 1.5, hero.pos.z, 24, { color: 0xffe48a, speed: 4, up: 6 });
+    this.fx.decal('circle_05', { x: hero.pos.x, z: hero.pos.z, size: 3, color: 0xffe48a, opacity: 0.8, life: 0.6, grow: 2.5 });
+    this.fx.light({ x: hero.pos.x, y: 3, z: hero.pos.z, color: 0xffe48a, intensity: 16, distance: 12, life: 0.7 });
+    hero.pop = 0.8; this.flash(0.12, '#ffe48a');
     const feat = hero.cls.features[hero.level];
     this.log(t('{0} reaches level {1}!', hero.label, hero.level) + (feat ? ' ' + t(feat) : ''), '#ffe48a');
     if (feat) this.ui.banner(`${hero.label} — ${t('Level {0}', hero.level)}`, t(feat), 2.6);
@@ -632,16 +700,19 @@ export class Game {
 
   // ---------------------------------------------------------------- main update
   update(dt) {
+    this.realDt = dt;
     if (this.hitstopT > 0) { this.hitstopT -= dt; dt *= 0.05; }
+    if (this.slowmoT > 0) { this.slowmoT -= this.realDt; dt *= 0.3; }
     dt *= this.timeScale;
     this.time += dt;
     input.poll(dt / Math.max(0.05, this.timeScale));
 
     if (this.mode === 'title' || this.mode === 'select') {
       this.titleHeroes && this.titleHeroes.forEach((m) => m.update(dt));
-      const a = this.time * 0.07;
-      this.camera.position.set(Math.sin(a) * 15, 9.5, Math.cos(a) * 15 + 2);
-      this.camera.lookAt(0, 1.6, 0);
+      // slow pendulum sway in front of the gathered party
+      const a = Math.sin(this.time * 0.06) * 0.5;
+      this.camera.position.set(Math.sin(a) * 14.5, 7.2 + Math.sin(this.time * 0.11) * 0.4, Math.cos(a) * 14.5 + 1);
+      this.camera.lookAt(Math.sin(a) * -1.5, 1.7, -1.2);
       this.updateShrineFire(dt);
       this.fx.update(dt, this.camera);
       return;
@@ -694,6 +765,7 @@ export class Game {
     if (this.boss) this.ui.bossBar(this.boss);
 
     this.updateCamera(dt);
+    this.updateOccluders();
     this.fx.update(dt, this.camera);
     this.ui.updateHud(dt);
     for (const l of this.logLines) l.t -= dt;
@@ -713,6 +785,7 @@ export class Game {
           p.y += (1.4 - p.y) * dt * 5;
           if (bd < 0.8) {
             this.run.ash += p.amount; this.fx.group.remove(p.obj); this.pickups.splice(i, 1);
+            this.fx.spawn('star_05', { x: best.pos.x, y: 1.6, z: best.pos.z, life: 0.25, size: 0.8, grow: 1.2, spin: 6, color: 0xffb060 });
             audio.play('coins', { vol: 0.25 });
             continue;
           }
@@ -743,6 +816,14 @@ export class Game {
 
   updateDoors(dt) {
     for (const d of this.doors) {
+      if (d.open && !d.wasOpen) {
+        // the seal bursts open
+        this.fx.burst('magic_05', d.x, 1.8, d.z, 14, { color: 0xff9a40, speed: 5, up: 3, size: 1.1 });
+        this.fx.burst('spark_04', d.x, 1.8, d.z, 10, { color: 0xffe0a0, speed: 7, up: 4, gravity: -10, size: 0.4 });
+        this.fx.light({ x: d.x + d.inX, y: 2.5, z: d.z + d.inZ, color: 0xff9a40, intensity: 14, distance: 12, life: 0.6 });
+        if (this.time > 1) audio.play('door', { vol: 0.5 });
+      }
+      d.wasOpen = d.open;
       const target = d.open ? 0 : 0.85;
       d.seal.material.opacity += (target - d.seal.material.opacity) * Math.min(1, dt * 4);
       d.seal.visible = d.seal.material.opacity > 0.02;
@@ -761,14 +842,14 @@ export class Game {
   }
 
   updateShrineFire(dt) {
+    this.atmos.update(dt);
+    this.hazards.update(dt);
+    for (const o of this.extra) if (o.isSprite && o.userData.flicker !== undefined) { o.userData.flicker += dt * 12; o.scale.y = 1.2 + Math.sin(o.userData.flicker) * 0.15 + Math.sin(o.userData.flicker * 2.7) * 0.08; o.scale.x = 0.9 + Math.sin(o.userData.flicker * 1.9) * 0.07; }
     const f = this.shrineFire;
     if (!f) return;
     f.t += dt;
     if (Math.random() < 0.8) this.fx.spawn(Math.random() < 0.5 ? 'flame_03' : 'flame_05', { x: f.x + frand(-0.4, 0.4), y: 0.5, z: f.z + frand(-0.4, 0.4), vy: frand(2, 4), life: frand(0.4, 0.8), size: frand(0.8, 1.6), grow: -0.6, color: 0xff9a40 });
     if (Math.random() < 0.15) this.fx.spawn('spark_06', { x: f.x + frand(-0.5, 0.5), y: 1, z: f.z + frand(-0.5, 0.5), vy: frand(3, 5), vx: frand(-1, 1), life: 1.2, size: 0.3, color: 0xffd080 });
-    // drifting ash motes everywhere (atmosphere)
-    if (Math.random() < 0.3) this.fx.spawn('spark_04', { x: this.camTarget.x + frand(-18, 18), y: frand(4, 9), z: this.camTarget.z + frand(-12, 12), vy: -0.6, vx: frand(-0.3, 0.3), life: 4, size: 0.18, color: 0xd8c0a0, fade: true, opacity: 0.6, additive: false });
-    for (const o of this.extra) if (o.isSprite && o.userData.flicker !== undefined) { o.userData.flicker += dt * 12; o.scale.y = 1.2 + Math.sin(o.userData.flicker) * 0.15; }
   }
 
   updateInteractPrompts() {
@@ -781,14 +862,47 @@ export class Game {
         audio.play('coins', { vol: 0.7 }); this.run.remains = null; this.scene.remove(it.obj); this.fx.freeLight(it.light);
         this.interactables = this.interactables.filter((x) => x !== it); continue;
       }
-      if (it) prompts.push({ hero: h, text: it.label });
-      const down = this.heroes.find((o) => o !== h && o.downed && o.distTo(h) < 3);
-      const slain = !down && this.heroes.find((o) => o !== h && o.dead && o.distTo(h) < 3);
-      if (down) prompts.push({ hero: h, text: t('Hold to revive {0}', down.label) });
-      else if (slain) prompts.push({ hero: h, text: t('Hold to raise {0} ({1} Ash)', slain.label, this.raiseCost()) });
     }
-    for (const d of this.doors) if (!d.open && this.cleared && this.chestPending) { /* chest first */ }
-    this.ui.prompts(prompts);
+    // world-space tooltips: the nearest player within reach gets a button prompt
+    // floating over the object, in their colour, with their own key/button
+    const tips = [];
+    const TIP_Y = { shrine: 3.2, chest: 2.6, peddler: 3.8, altar: 4, remains: 2.2 };
+    for (const it of this.interactables) {
+      let best = null, bd = 1e9;
+      for (const h of this.heroes) if (h.canAct && !h.menuLock) { const d = Math.hypot(it.x - h.pos.x, it.z - h.pos.z); if (d < bd) { bd = d; best = h; } }
+      if (!best || bd > it.r + 3.5) continue;
+      tips.push({ key: 'it' + it.x.toFixed(1) + it.z.toFixed(1), hero: best, text: it.label, pos: new THREE.Vector3(it.x, TIP_Y[it.kind] || 2.6, it.z), inRange: bd < it.r });
+    }
+    for (const o of this.heroes) {
+      if (!(o.downed || o.dead) || this.heroes.length < 2) continue;
+      let best = null, bd = 1e9;
+      for (const h of this.heroes) if (h !== o && h.canAct && !h.menuLock) { const d = h.distTo(o); if (d < bd) { bd = d; best = h; } }
+      if (!best || bd > 7) continue;
+      tips.push({ key: 'ally' + o.slot, hero: best, text: o.downed ? 'Hold to revive {0}' : 'Hold to raise {0} ({1} Ash)', args: [o.label, this.raiseCost()], pos: new THREE.Vector3(o.pos.x, 3.2, o.pos.z), inRange: bd < 3 });
+    }
+    this.ui.worldTips(this.mode === 'play' && !this.paused ? tips : [], this.camera);
+    this.ui.prompts([]);
+  }
+
+  // pillars / tall props between the camera (south, above) and a hero fade out
+  updateOccluders() {
+    const occ = this.room && this.room.occluders;
+    if (!occ || !occ.length) return;
+    const k = Math.min(1, (this.realDt || 0.016) * 10);
+    for (const o of occ) {
+      let hide = false;
+      for (const h of this.heroes) {
+        if (!h.model) continue;
+        const dz = o.z - h.pos.z, dx = Math.abs(o.x - h.pos.x);
+        if (dz > -0.6 && dz < 7.5 && dx < 2.4 + dz * 0.12) { hide = true; break; }
+      }
+      const target = hide ? 0.28 : 1;
+      if (Math.abs(o.a - target) < 0.005) continue;
+      o.a += (target - o.a) * k;
+      if (Math.abs(o.a - target) < 0.01) o.a = target;
+      const fading = o.a < 0.99;
+      for (const m of o.mats) { m.opacity = o.a; if (m.transparent !== fading) { m.transparent = fading; m.needsUpdate = true; } m.depthWrite = !fading; }
+    }
   }
 
   updateCamera(dt) {
@@ -808,17 +922,33 @@ export class Game {
     this.camDist += (want - this.camDist) * Math.min(1, dt * 2);
     const D = this.camDist;
     let sx = 0, sy = 0;
-    if (this.shakeT > 0) { this.shakeT = Math.max(0, this.shakeT - dt * 1.8); const s = this.shakeT * 0.9; sx = frand(-s, s); sy = frand(-s, s); }
+    // shake and punch run on real time so they stay alive during hitstop
+    const rdt = this.realDt || dt;
+    if (this.shakeT > 0) { this.shakeT = Math.max(0, this.shakeT - rdt * 1.8); const s = this.shakeT * 0.9; sx = frand(-s, s); sy = frand(-s, s); }
+    const pk = Math.pow(0.0004, rdt);
+    this.punch.x *= pk; this.punch.z *= pk; this.zoomPunch *= Math.pow(0.002, rdt);
+    sx += this.punch.x; const pz = this.punch.z;
     // keep the room framed: clamp the look-at point inside the room bounds
     const r = this.room;
     const hx = Math.max(0, r.w * CELL / 2 - 13 * D), hz = Math.max(0, r.h * CELL / 2 - 9 * D);
     const tx = Math.max(-hx, Math.min(hx, this.camTarget.x)), tz = Math.max(-hz - 2, Math.min(hz, this.camTarget.z));
-    this.camera.position.set(tx + sx, 21 * D + sy, tz + 24 * D);
-    this.camera.lookAt(tx + sx * 0.5, 0.5, tz - 0.5);
+    const Z = 1 - this.zoomPunch; // brief zoom-in kick on big hits
+    this.camera.position.set(tx + sx, 21 * D * Z + sy, tz + pz + 24 * D * Z);
+    this.camera.lookAt(tx + sx * 0.5, 0.5, tz + pz * 0.5 - 0.5);
   }
 
   render() {
-    if (this.flashT > 0) { this.flashT -= 1 / 60; this.psx.post.uniforms.uFlash.value = Math.max(0, this.flashT / (this.flashMax || 0.2)) * 0.45; } else this.psx.post.uniforms.uFlash.value = 0;
+    this.aberr = (this.aberr || 0) * 0.86;
+    this.psx.post.uniforms.uAberr.value = this.aberr;
+    // hurt vignette: spikes on hits, plus a heartbeat pulse while anyone is near death
+    this.hurtVignette = (this.hurtVignette || 0) * 0.93;
+    let pulse = 0;
+    if (this.mode === 'play') for (const h of this.heroes) if (h.canAct && h.hp < h.maxHp * 0.3) {
+      const beat = Math.pow(Math.max(0, Math.sin(performance.now() / 1000 * 7.5)), 12);
+      pulse = Math.max(pulse, (0.18 + 0.5 * (1 - h.hp / (h.maxHp * 0.3))) * (0.45 + 0.55 * beat));
+    }
+    this.psx.post.uniforms.uHurt.value = Math.min(0.7, Math.max(this.hurtVignette * 0.6, pulse));
+    if (this.flashT > 0) { this.flashT -= 1 / 60; this.psx.post.uniforms.uFlash.value = Math.max(0, this.flashT / (this.flashMax || 0.2)) * (this.flashAmt ?? 0.45); } else this.psx.post.uniforms.uFlash.value = 0;
     const dying = this.mode === 'play' && this.heroes.length && this.heroes.every((h) => h.downed || h.dead);
     this.psx.post.uniforms.uDesat.value += ((dying || this.mode === 'over' ? 0.8 : 0) - this.psx.post.uniforms.uDesat.value) * 0.05;
     this.psx.render(this.scene, this.camera, this.time);

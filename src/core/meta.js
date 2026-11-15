@@ -1,5 +1,5 @@
 // Persistent meta-progression (Oath Marks, unlocks, records, settings) in localStorage.
-const KEY = 'ashen-oath-save-v1';
+const KEY = 'ashen-oath-save-v1'; // kept from the working title so existing saves carry over
 const DEFAULT = { marks: 0, unlocked: [], runs: 0, wins: 0, bestDepth: 0, kills: 0, vows: [], settings: null, seen: [] };
 
 function read() {

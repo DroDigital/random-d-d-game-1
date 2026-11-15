@@ -1,8 +1,8 @@
 {
-  "name": "ashen-oath",
+  "name": "oathguard",
   "version": "1.0.0",
   "private": true,
-  "description": "Ashen Oath - a local co-op D&D 5e souls-like roguelite (1-4 players) that runs in any browser, no engine required.",
+  "description": "Oathguard - a local co-op D&D 5e souls-like roguelite (1-4 players) that runs in any browser, no engine required.",
   "license": "MIT",
   "scripts": {
     "build": "node tools/build.mjs",
@@ -26,12 +26,12 @@
     "three": "^0.170.0"
   },
   "main": "desktop/main.js",
-  "author": "Ashen Oath",
+  "author": "Oathguard",
   "homepage": "https://github.com/DroDigital/random-d-d-game-1",
   "build": {
     "appId": "io.github.drodigital.ashenoath",
-    "productName": "Ashen Oath",
-    "copyright": "Ashen Oath. Assets CC0 / CC BY 3.0, see licenses.",
+    "productName": "Oathguard",
+    "copyright": "Oathguard. Assets CC0 / CC BY 3.0, see licenses.",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -89,11 +89,11 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Ashen Oath",
-      "artifactName": "AshenOath-Setup-${version}.${ext}"
+      "shortcutName": "Oathguard",
+      "artifactName": "Oathguard-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "AshenOath-Portable-${version}.${ext}"
+      "artifactName": "Oathguard-Portable-${version}.${ext}"
     },
     "linux": {
       "target": [
@@ -112,10 +112,10 @@
       ],
       "category": "Game",
       "icon": "build/icon.png",
-      "artifactName": "AshenOath-${version}-${arch}.${ext}"
+      "artifactName": "Oathguard-${version}-${arch}.${ext}"
     },
     "dmg": {
-      "artifactName": "AshenOath-${version}-mac.${ext}"
+      "artifactName": "Oathguard-${version}-mac.${ext}"
     }
   }
 }

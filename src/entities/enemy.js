@@ -68,7 +68,15 @@ export class Enemy extends Actor {
     this.syncModel(0);
     if (this.state === 'spawn' && !isProp) {
       if (this.anims.spawn && this.model.has(this.anims.spawn)) this.model.once(this.anims.spawn, { duration: 1.0 });
-      this.game.fx.burst('smoke_07', this.pos.x, 0.5, this.pos.z, 8, { color: 0x403a48, speed: 2, up: 1.5, additive: false, size: 1.4 });
+      const fx = this.game.fx, x = this.pos.x, z = this.pos.z;
+      fx.burst('smoke_07', x, 0.5, z, 8, { color: 0x403a48, speed: 2, up: 1.5, additive: false, size: 1.4 });
+      // summoning sigil: the foe claws up out of a glowing circle
+      const col = this.elite ? 0xffb347 : 0xc04aff;
+      fx.decal('symbol_01', { x, z, size: this.elite ? 4.2 : 3.2, color: col, life: 1.2, opacity: 0.9, fadeIn: 0.15, grow: 0.25, rot: Math.random() * 6 });
+      fx.decal('circle_05', { x, z, size: 3, color: col, life: 0.6, opacity: 0.6, grow: 0.8 });
+      fx.burst('spark_06', x, 0.3, z, 10, { color: col, speed: 1.5, up: 6, size: 0.3, life: 0.7 });
+      fx.light({ x, y: 1.2, z, color: col, intensity: 18, distance: 9, life: 0.6 });
+      if (!this.flying) this.sinkIn = this.height * 0.9;
     }
   }
 
@@ -85,17 +93,26 @@ export class Enemy extends Actor {
     if (this.ward > 0) { const ab = Math.min(this.ward, amount); this.ward -= ab; amount -= ab; if (this.ward <= 0) this.game.fx.text('WARD BROKEN', this.pos.x, this.height + 1, this.pos.z, { color: '#7fc8ff' }); }
     this.hp -= amount;
     if (this.state === 'disguised') this.reveal();
-    this.model.hitFlash(crit ? 0xffd23f : 0xffffff);
+    // hit reaction: squash pop, plus a short flinch/hitstun for ordinary foes
+    const rel = amount / this.maxHp;
+    this.pop = Math.min(1, Math.max(this.pop || 0, (this.isBoss ? 0.25 : 0.5) + rel * 2 + (heavy || crit ? 0.3 : 0)));
+    this.lastHitAngle = angle; this.lastHitHeavy = heavy || crit;
+    if (!this.isBoss && this.hp > 0 && (rel > 0.08 || heavy || crit) && ['chase', 'recover', 'spawn'].includes(this.state)) {
+      if (this.model && this.model.has(this.anims.hit)) this.model.once(this.anims.hit, { duration: heavy || crit ? 0.4 : 0.26 });
+      this.state = 'recover'; this.stateT = Math.max(this.stateT, this.elite ? 0.12 : heavy || crit ? 0.38 : 0.2);
+    }
+    this.model?.hitFlash(crit ? 0xffd23f : 0xffffff);
     this.game.fx.blood(this.pos.x, this.pos.z, this.tags.includes('undead') ? 0xd8d0c0 : this.tags.includes('ooze') || this.tags.includes('plant') ? 0x88c040 : 0x8a1020, crit ? 14 : 6);
     if (this.tags.includes('undead')) audio.play('bone', { vol: 0.35 });
     if (source && source.isHero && this.affixes.includes('thorned') && source.distTo(this) < 4) applyDamage(this.game, this, source, [{ amount: rollDice('1d6'), type: 'piercing' }]);
     if (angle !== null && knock && !this.isBoss) { const k = knock * (this.elite ? 0.5 : 1); this.knock.x += Math.cos(angle) * k; this.knock.z += Math.sin(angle) * k; }
     if (source && source.isHero) { this.target = source; this.retarget = 2; this.lastHitBy = source; }
     // poise / stagger
-    this.poise += poise; this.poiseRegenT = 3;
+    if (!(this.poiseLock > 0)) { this.poise += poise; this.poiseRegenT = 3; }
     if (this.poise >= this.poiseMax && this.state !== 'stagger' && this.hp > 0) {
       this.poise = 0;
-      this.stagger(this.isBoss ? 2.2 : 1.3);
+      this.stagger(this.isBoss ? 1.6 : 1.3);
+      if (this.isBoss) this.poiseLock = 8; // no stun-locking bosses
     }
     if (this.hp <= 0) this.die(source);
   }
@@ -103,7 +120,7 @@ export class Enemy extends Actor {
   stagger(t) {
     this.cancelAttack();
     this.state = 'stagger'; this.stateT = t; this.addCond('stagger', t);
-    this.model.once(this.anims.hit, { duration: Math.min(t, 0.6) });
+    this.model?.once(this.anims.hit, { duration: Math.min(t, 0.6) });
     this.game.fx.text('STAGGERED', this.pos.x, this.height + 1.2, this.pos.z, { color: '#ffb347', big: true });
     audio.play('hitHeavy', { vol: 0.6 });
   }
@@ -115,7 +132,14 @@ export class Enemy extends Actor {
     this.alive = false; this.hp = 0;
     this.cancelAttack();
     this.state = 'dead'; this.stateT = 2.2;
-    if (this.model.has && this.model.has(this.anims.death)) this.model.once(this.anims.death, { hold: true, duration: 1.0 });
+    // killing blows send ordinary foes flying away from the hit
+    if (!this.isBoss) {
+      const a = this.lastHitAngle ?? (source ? source.dirTo(this) : frand(0, 6.28));
+      const f = (this.lastHitHeavy ? 11 : 7) * (this.height > 2.8 ? 0.6 : 1);
+      this.fling = { vx: Math.cos(a) * f, vz: Math.sin(a) * f, vy: this.lastHitHeavy ? 7 : 4.5, y: 0, spin: frand(-1, 1) * 4 };
+    }
+    this.sink = 0;
+    if (this.model && this.model.has(this.anims.death)) this.model.once(this.anims.death, { hold: true, duration: 1.0 });
     this.game.onEnemyDeath(this, source);
     audio.play(this.tags.includes('undead') ? 'bone' : 'hitHeavy', { vol: 0.6 });
     if (this.def.split && !this.thrall) for (let i = 0; i < 2; i++) this.game.spawnEnemy(this.def.split, this.pos.x + frand(-1, 1), this.pos.z + frand(-1, 1), { noSpawnAnim: true });
@@ -156,26 +180,42 @@ export class Enemy extends Actor {
     this.model.update(dt * (this.has('frozen') ? 0 : this.has('chilled') ? 0.6 : 1));
     if (this.state === 'dead') {
       this.stateT -= dt;
-      if (this.stateT < 0.8) this.model.root.position.y -= dt * 1.5;
+      const fl = this.fling;
+      if (fl) {
+        this.move(fl.vx * dt, fl.vz * dt);
+        fl.vx *= Math.pow(0.08, dt); fl.vz *= Math.pow(0.08, dt);
+        fl.vy -= 26 * dt; fl.y += fl.vy * dt;
+        if (fl.y <= 0) {
+          if (fl.vy < -3) { this.game.fx.burst('smoke_03', this.pos.x, 0.3, this.pos.z, 5, { color: 0x6a5a50, speed: 2.5, up: 0.8, size: 1, additive: false }); audio.play('bone', { vol: 0.25 }); }
+          fl.y = 0; fl.vy = Math.abs(fl.vy) > 3 ? -fl.vy * 0.3 : 0; fl.spin *= 0.4;
+        }
+        this.visualFacing += fl.spin * dt;
+      }
+      if (this.stateT < 0.8) this.sink += dt * 1.5;
+      this.model.root.position.set(this.pos.x, (fl ? fl.y : 0) + this.hover * (fl ? 0.3 : 1) - this.sink, this.pos.z);
+      this.model.root.rotation.y = Math.PI / 2 - this.visualFacing;
+      if (this.shadow) this.shadow.position.set(this.pos.x, 0.06, this.pos.z);
+      if (this.pop > 0) { this.pop = Math.max(0, this.pop - dt * 5); const p = this.pop; this.model.root.scale.set(1 + 0.22 * p, 1 - 0.2 * p, 1 + 0.22 * p); }
       if (this.stateT <= 0) { this.remove(); this.gone = true; }
       return;
     }
     // damage over time
-    if (this.burn) { this.burn.t -= dt; this.burnTick = (this.burnTick || 1) - dt; if (this.burnTick <= 0) { this.burnTick = 1; applyDamage(g, this.burn.src, this, [{ amount: rollDice(this.burn.dice), type: 'fire' }]); g.fx.burst('flame_03', this.pos.x, 1.2, this.pos.z, 3, { color: 0xff7a2f, speed: 1, up: 2 }); } if (this.burn && this.burn.t <= 0) this.burn = null; }
-    if (this.bleed) { this.bleed.t -= dt; this.bleedTick = (this.bleedTick || 1) - dt; if (this.bleedTick <= 0) { this.bleedTick = 1; applyDamage(g, this.bleed.src, this, [{ amount: rollDice('1d6'), type: 'slashing' }]); } if (this.bleed && this.bleed.t <= 0) this.bleed = null; }
+    if (this.burn) { this.burn.t -= dt; this.burnTick = (this.burnTick || 1) - dt; if (this.burnTick <= 0) { this.burnTick = 1; applyDamage(g, this.burn.src, this, [{ amount: rollDice(this.burn.dice), type: 'fire' }], { impact: false }); g.fx.burst('flame_03', this.pos.x, 1.2, this.pos.z, 3, { color: 0xff7a2f, speed: 1, up: 2 }); } if (this.burn && this.burn.t <= 0) this.burn = null; }
+    if (this.bleed) { this.bleed.t -= dt; this.bleedTick = (this.bleedTick || 1) - dt; if (this.bleedTick <= 0) { this.bleedTick = 1; applyDamage(g, this.bleed.src, this, [{ amount: rollDice('1d6'), type: 'slashing' }], { impact: false }); } if (this.bleed && this.bleed.t <= 0) this.bleed = null; }
     if (!this.alive) return;
     if (this.thrall) { this.thrallT -= dt; if (this.thrallT <= 0) { this.die(null); return; } }
     if (this.poiseRegenT > 0) this.poiseRegenT -= dt; else this.poise = Math.max(0, this.poise - this.poiseMax * 0.3 * dt);
     if (this.affixes.includes('ember')) { this.emberT = (this.emberT || 0) - dt; if (this.emberT <= 0) { this.emberT = 1.2; g.spawnZone({ kind: 'fire', owner: this, x: this.pos.x, z: this.pos.z, radius: 1.4, life: 4 }); } }
 
     const frozen = this.has('frozen') || this.has('prone');
-    let speedMul = (this.has('slowed') ? 0.25 : 1) * (this.has('chilled') ? 0.6 : 1) * (frozen ? 0 : 1);
+    let speedMul = (this.has('slowed') ? 0.25 : 1) * (this.has('chilled') ? 0.6 : 1) * (this.has('webbed') ? 0.5 : 1) * (frozen ? 0 : 1);
 
     this.retarget -= dt;
     if (!this.target || !this.target.alive || (this.target.isHero && !this.target.canAct) || this.retarget <= 0) { this.target = this.pickTarget(); this.retarget = 1.5; }
     const t = this.target;
 
     this.stateT -= dt; this.cd -= dt * (frozen ? 0 : 1);
+    if (this.sinkIn) this.sinkIn = Math.max(0, this.sinkIn - dt * this.height * 2.2);
     switch (this.state) {
       case 'spawn': if (this.stateT <= 0) this.state = 'chase'; break;
       case 'disguised': {

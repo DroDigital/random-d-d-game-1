@@ -1,4 +1,4 @@
-# Builds native desktop packages of Ashen Oath on each OS's own runner:
+# Builds native desktop packages of Oathguard on each OS's own runner:
 #   Windows: NSIS installer + portable .exe
 #   macOS:   universal (Intel + Apple Silicon) .dmg + .zip (unsigned)
 #   Linux:   AppImage + .tar.gz
@@ -43,7 +43,7 @@ jobs:
         shell: bash # PowerShell would split '-c.win.…=true' into two arguments
       - uses: actions/upload-artifact@v4
         with:
-          name: ashen-oath-${{ runner.os }}
+          name: oathguard-${{ runner.os }}
           path: |
             dist/*.exe
             dist/*.dmg

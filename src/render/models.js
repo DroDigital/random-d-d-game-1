@@ -2,7 +2,7 @@
 // animation rigs; Quaternius monsters bring their own clips.
 import * as THREE from 'three';
 import { loadGLTF, loadTexture, cloneSkinned } from '../core/assets.js';
-import { retroify, psxify } from './psx.js';
+import { retroify, psxify, addRim } from './psx.js';
 
 const RIGS = {
   Rig_Medium: ['General', 'MovementBasic', 'MovementAdvanced', 'CombatMelee', 'CombatRanged', 'Special'],
@@ -53,7 +53,7 @@ export class ModelLib {
   }
 
   // Build an animated instance. opts: {path, rig, height, gear:{r,l}, gearFolder, skin:{base,name}}
-  async instance({ path, rig = null, height = 2.4, gear = null, gearFolder = 'gear', skin = null, tint = null, lift = 0.3 }) {
+  async instance({ path, rig = null, height = 2.4, gear = null, gearFolder = 'gear', skin = null, tint = null, lift = 0.3, rim = 'foe' }) {
     const t = await this.template(path);
     const scene = cloneSkinned(t.scene);
     const root = new THREE.Group();
@@ -73,7 +73,7 @@ export class ModelLib {
     // readability lift: characters faintly self-illuminate their own texture so
     // dark robes never vanish into dark floors (classic PS1 trick)
     mats.forEach((m) => {
-      psxify(m);
+      if (rim) addRim(m, rim); else psxify(m);
       if (m.map && m.emissive && m.emissive.getHex() === 0) { m.emissiveMap = m.map; m.emissive.setRGB(lift, lift, lift); m.needsUpdate = true; }
       m.userData.baseEmissive = m.emissive ? m.emissive.clone() : null;
     });
@@ -88,7 +88,7 @@ export class ModelLib {
         const slot = scene.getObjectByName('handslot.' + side);
         if (!slot) continue;
         const gm = await this.gearModel(gear[side], gearFolder);
-        gm.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); mats.push(o.material); } });
+        gm.traverse((o) => { if (o.isMesh) { o.material = o.material.clone(); if (rim) addRim(o.material, rim); else { o.material.userData.psx = false; psxify(o.material); } mats.push(o.material); } });
         slot.add(gm);
       }
     }

@@ -31,9 +31,9 @@ export const BOONS = [
   { id: 'hunters_prey', name: "Hunter's Prey", rarity: 'common', pact: 'fang', icon: C('weapon/artefact/urand_snakebite'), desc: '+1d8 damage against foes below full HP, once per second.', flags: ['prey'] },
   { id: 'sharpshooter', name: 'Sharpshooter', rarity: 'uncommon', pact: 'fang', icon: C('weapon/artefact/urand_storm_bow'), desc: 'Crit range +1. Ranged attacks gain +2 damage.', mods: { critRange: 1 }, flags: ['sharpshooter'] },
   // --- Ember
-  { id: 'flame_tongue', name: 'Flame Tongue', rarity: 'rare', pact: 'ember', icon: C('weapon/artefact/urand_firestarter'), desc: 'Your attacks deal an extra 2d6 fire damage.', onHit: [{ dice: '2d6', type: 'fire' }] },
+  { id: 'flame_tongue', name: 'Flame Tongue', rarity: 'rare', pact: 'ember', icon: C('weapon/artefact/urand_firestarter'), desc: 'Your attacks deal an extra 1d6 fire damage.', onHit: [{ dice: '1d6', type: 'fire' }] },
   { id: 'staff_fire', name: 'Staff of Fire', rarity: 'uncommon', pact: 'ember', icon: C('staff/i-staff_fire'), desc: 'Hits set foes ablaze: 1d4 fire per second for 3s.', flags: ['ignite'] },
-  { id: 'scorching_ray', name: 'Scorching Ray', rarity: 'uncommon', pact: 'ember', icon: C('rod/i-rod_ignition'), desc: 'Every 3rd attack also fires 3 rays of 2d6 fire.', flags: ['scorching_ray'] },
+  { id: 'scorching_ray', name: 'Scorching Ray', rarity: 'uncommon', pact: 'ember', icon: C('rod/i-rod_ignition'), desc: 'Every 3rd attack also fires 3 rays of 1d6 fire.', flags: ['scorching_ray'] },
   { id: 'hellish_rebuke', name: 'Hellish Rebuke', rarity: 'common', pact: 'ember', icon: C('amulet/i-rage'), desc: 'When hit, the attacker takes 2d10 fire (DEX half). 3s cooldown.', flags: ['rebuke'] },
   { id: 'dragon_scale', name: 'Dragon Scale Mail', rarity: 'very_rare', pact: 'ember', icon: C('armour/artefact/urand_dragonskin'), desc: '+1 AC, resistance to fire, advantage on DEX saves.', mods: { ac: 1 }, flags: ['resist_fire', 'adv_dex_saves'] },
   { id: 'wyrmbane', name: 'Ashbrand', rarity: 'rare', pact: 'ember', icon: C('weapon/artefact/urand_wyrmbane'), desc: '+1 to hit. Crits detonate for 3d6 fire around the target.', mods: { toHit: 1 }, flags: ['crit_burst'] },
@@ -44,8 +44,8 @@ export const BOONS = [
   { id: 'ice_storm', name: 'Ice Knife', rarity: 'common', pact: 'rime', icon: C('ring/i-ice'), desc: 'Dodging leaves a shard burst: 2d6 cold to nearby foes (DEX half).', flags: ['ice_dodge'] },
   { id: 'cloak_night', name: 'Cloak of Winter Night', rarity: 'rare', pact: 'rime', icon: C('armour/artefact/urand_night'), desc: '+1 AC and +1 to all saves. Frozen foes take +1d10.', mods: { ac: 1, saveBonus: 1 }, flags: ['shatter'] },
   // --- Dawn
-  { id: 'sun_blade', name: 'Sun Blade', rarity: 'rare', pact: 'dawn', icon: C('weapon/artefact/urand_eos'), desc: '+2 to hit. +1d8 radiant (doubled against undead).', mods: { toHit: 2 }, onHit: [{ dice: '1d8', type: 'radiant', undeadX2: true }] },
-  { id: 'holy_avenger', name: 'Holy Avenger', rarity: 'legendary', pact: 'dawn', icon: C('weapon/artefact/urand_undeadhunter'), desc: '+3 hit/damage, +2d10 radiant vs undead & fiends. Allies near you gain +2 to saves.', mods: { toHit: 3, dmg: 3 }, onHit: [{ dice: '2d10', type: 'radiant', only: ['undead', 'fiend'] }], flags: ['aura_saves'] },
+  { id: 'sun_blade', name: 'Sun Blade', rarity: 'rare', pact: 'dawn', icon: C('weapon/artefact/urand_eos'), desc: '+2 to hit. +1d6 radiant (doubled against undead).', mods: { toHit: 2 }, onHit: [{ dice: '1d6', type: 'radiant', undeadX2: true }] },
+  { id: 'holy_avenger', name: 'Holy Avenger', rarity: 'legendary', pact: 'dawn', icon: C('weapon/artefact/urand_undeadhunter'), desc: '+3 hit/damage, +1d10 radiant vs undead & fiends. Allies near you gain +2 to saves.', mods: { toHit: 3, dmg: 3 }, onHit: [{ dice: '1d10', type: 'radiant', only: ['undead', 'fiend'] }], flags: ['aura_saves'] },
   { id: 'divine_smite', name: 'Divine Smite', rarity: 'uncommon', pact: 'dawn', icon: C('amulet/i-faith'), desc: 'Heavy attacks that hit add 2d8 radiant.', flags: ['smite'] },
   { id: 'aura_vitality', name: 'Aura of Vitality', rarity: 'rare', pact: 'dawn', icon: C('amulet/celtic_yellow'), desc: 'Every 6s, you and nearby allies heal 1d6.', flags: ['aura_vitality'] },
   { id: 'ring_regen', name: 'Ring of Regeneration', rarity: 'very_rare', pact: 'dawn', icon: C('ring/i-regeneration'), desc: 'Regain 1 HP every 2 seconds.', mods: { regen: 0.5 } },

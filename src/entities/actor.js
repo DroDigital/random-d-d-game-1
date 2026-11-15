@@ -43,10 +43,28 @@ export class Actor {
       || room.solidAt(x + r * 0.7, z - r * 0.7, fl) || room.solidAt(x - r * 0.7, z - r * 0.7, fl);
   }
 
+  // round props (barrels, urns, coffins...) — only block movement that goes deeper
+  // into them, so nothing ever gets stuck if it starts overlapping one
+  hitsProp(x, z) {
+    const cs = this.game.room && this.game.room.colliders;
+    if (!cs || !cs.length || this.flying || this.ghost) return false;
+    const r = this.radius * 0.8;
+    for (const c of cs) {
+      if (!c.on) continue;
+      const dx = x - c.x, dz = z - c.z, m = c.r + r, d2 = dx * dx + dz * dz;
+      if (d2 >= m * m) continue;
+      const ox = this.pos.x - c.x, oz = this.pos.z - c.z;
+      if (d2 >= ox * ox + oz * oz) continue;
+      if (this.isBoss && c.haz && this.game.hazards) { this.game.hazards.smash(c); continue; }
+      return true;
+    }
+    return false;
+  }
+
   move(dx, dz) {
-    if (dx && !this.blocked(this.pos.x + dx, this.pos.z)) this.pos.x += dx;
+    if (dx && !this.blocked(this.pos.x + dx, this.pos.z) && !this.hitsProp(this.pos.x + dx, this.pos.z)) this.pos.x += dx;
     else if (dx) this.hitWall = true;
-    if (dz && !this.blocked(this.pos.x, this.pos.z + dz)) this.pos.z += dz;
+    if (dz && !this.blocked(this.pos.x, this.pos.z + dz) && !this.hitsProp(this.pos.x, this.pos.z + dz)) this.pos.z += dz;
     else if (dz) this.hitWall = true;
   }
 
@@ -80,8 +98,14 @@ export class Actor {
     if (!this.model) return;
     const d = this.angleDiff(this.facing, this.visualFacing);
     this.visualFacing += d * Math.min(1, dt * 18);
-    this.model.root.position.set(this.pos.x, this.pos.y + this.hover, this.pos.z);
+    this.model.root.position.set(this.pos.x, this.pos.y + this.hover - (this.sinkIn || 0), this.pos.z);
     this.model.root.rotation.y = Math.PI / 2 - this.visualFacing;
+    // squash & stretch pop when hit (holds during hitstop, which sells the impact)
+    if (this.pop > 0) {
+      this.pop = Math.max(0, this.pop - dt * 5);
+      const p = this.pop;
+      this.model.root.scale.set(1 + 0.22 * p, 1 - 0.2 * p, 1 + 0.22 * p);
+    } else if (this.model.root.scale.x !== 1) this.model.root.scale.set(1, 1, 1);
     if (this.shadow) this.shadow.position.set(this.pos.x, 0.06, this.pos.z);
   }
 }
