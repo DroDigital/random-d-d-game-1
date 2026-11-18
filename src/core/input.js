@@ -20,6 +20,14 @@ const KB_LAYOUTS = {
 
 const PAD_GLYPH = { attack: 'X', heavy: 'RT', dodge: 'A', skill1: 'LB', skill2: 'RB', potion: 'Y', interact: 'B', lock: 'R3', move: 'L-STICK', confirm: 'A', back: 'B' };
 const PAD_BTN = { attack: [2], heavy: [7], dodge: [0], skill1: [4], skill2: [5], potion: [3], interact: [1], lock: [11], pause: [9], confirm: [0], back: [1] };
+// PlayStation pads (DualSense / DualShock). Browsers normally expose them with the
+// "standard" layout (PAD_BTN above), but on some platforms the pad arrives as raw
+// HID: buttons in HID usage order (Square, Cross, Circle, Triangle, L1, R1, L2, R2,
+// Create, Options, L3, R3, PS, Touchpad) and the d-pad as a hat switch on axes[9].
+const SONY_RAW_BTN = { attack: [0], heavy: [7], dodge: [1], skill1: [4], skill2: [5], potion: [3], interact: [2], lock: [11], pause: [9], confirm: [1], back: [2] };
+const HAT = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]]; // N NE E SE S SW W NW
+const hatDir = (v) => { if (typeof v !== 'number' || Math.abs(v) > 1.2) return null; return HAT[Math.round((v + 1) * 3.5)] || null; }; // neutral reads as ~1.29 -> null
+const isSonyRaw = (p) => p.mapping !== 'standard' && /054c|dualsense|dualshock|playstation/i.test(p.id || '');
 const ACTIONS = ['attack', 'heavy', 'dodge', 'skill1', 'skill2', 'potion', 'interact', 'lock', 'pause', 'confirm', 'back', 'up', 'down', 'left', 'right'];
 
 const keys = new Set();
@@ -62,8 +70,15 @@ class Controller {
       const dz = (v) => (Math.abs(v) < 0.2 ? 0 : v);
       mx = dz(p.axes[0] || 0); my = dz(p.axes[1] || 0);
       const dp = (i) => !!(p.buttons[i] && p.buttons[i].pressed);
-      if (dp(14)) mx = -1; if (dp(15)) mx = 1; if (dp(12)) my = -1; if (dp(13)) my = 1;
-      for (const a of ACTIONS) this.held[a] = (PAD_BTN[a] || []).some((i) => dp(i));
+      const sony = isSonyRaw(p);
+      if (sony) {
+        // raw PlayStation pad: d-pad is a hat switch; buttons 12/13 are PS and touchpad, not d-pad
+        const hat = hatDir(p.axes[9]); if (hat) { mx = hat[0]; my = hat[1]; }
+      } else {
+        if (dp(14)) mx = -1; if (dp(15)) mx = 1; if (dp(12)) my = -1; if (dp(13)) my = 1;
+      }
+      const btnMap = sony ? SONY_RAW_BTN : PAD_BTN;
+      for (const a of ACTIONS) this.held[a] = (btnMap[a] || []).some((i) => dp(i));
       this.held.up = my < -0.5; this.held.down = my > 0.5; this.held.left = mx < -0.5; this.held.right = mx > 0.5;
       const ax = dz(p.axes[2] || 0), ay = dz(p.axes[3] || 0);
       this.aim = Math.hypot(ax, ay) > 0.35 ? { x: ax, y: ay } : null;
