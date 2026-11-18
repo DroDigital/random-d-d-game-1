@@ -2,3 +2,6 @@ node_modules/
 shots/
 dist/
 .DS_Store
+
+# Recall session logs (local only)
+.recall/
